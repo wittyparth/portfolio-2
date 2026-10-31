@@ -11,6 +11,9 @@ export interface Store {
   set(key: string, value: unknown, opts?: SetOptions): Promise<boolean>;
   del(key: string): Promise<void>;
   incr(key: string): Promise<number>;
+  decr(key: string): Promise<number>;
+  /** incr, and start the TTL if the key has none, in one round trip (no gap where a key can live forever). */
+  incrExpire(key: string, seconds: number): Promise<number>;
   expire(key: string, seconds: number): Promise<void>;
   lpush(key: string, value: string): Promise<void>;
   lrange(key: string, start: number, stop: number): Promise<string[]>;
@@ -40,6 +43,11 @@ function upstash(): Store {
     },
     del: async (k) => void (await r.del(k)),
     incr: (k) => r.incr(k),
+    decr: (k) => r.decr(k),
+    incrExpire: async (k, s) => {
+      const [n] = await r.multi().incr(k).expire(k, s, "NX").exec<[number, number]>();
+      return n;
+    },
     expire: async (k, s) => void (await r.expire(k, s)),
     lpush: async (k, v) => void (await r.lpush(k, v)),
     lrange: async (k, a, b) => (await r.lrange<string>(k, a, b)).map((x) => (typeof x === "string" ? x : JSON.stringify(x))),
@@ -100,6 +108,18 @@ function memory(): Store {
       m.set(k, { value: n, expires: e?.expires });
       return n;
     },
+    decr: async (k) => {
+      const e = live(k);
+      const n = Number(e?.value ?? 0) - 1;
+      m.set(k, { value: n, expires: e?.expires });
+      return n;
+    },
+    incrExpire: async (k, s) => {
+      const e = live(k);
+      const n = Number(e?.value ?? 0) + 1;
+      m.set(k, { value: n, expires: e?.expires ?? Date.now() + s * 1000 });
+      return n;
+    },
     expire: async (k, s) => {
       const e = live(k);
       if (e) e.expires = Date.now() + s * 1000;
@@ -125,22 +145,54 @@ function memory(): Store {
   };
 }
 
-export const store: Store =
-  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN ? upstash() : memory();
+const configured = Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+const production = process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
+
+export const store: Store = configured ? upstash() : memory();
+
+/** True when writes would land somewhere durable. Dev may use the in-memory stand-in; production may not. */
+export const storeWritable = configured || !production;
+
+let warned = false;
+
+/**
+ * Call at the top of every write route. In production without Upstash, per-instance memory would
+ * silently lose or fork data, so refuse with a 503 (and shout once in the logs) instead.
+ */
+export function storeUnavailable(): Response | null {
+  if (storeWritable) return null;
+  if (!warned) {
+    warned = true;
+    console.error(
+      "[store] UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN are missing in production. " +
+        "Write endpoints are returning 503 until they are set.",
+    );
+  }
+  return Response.json(
+    { ok: false, error: "unavailable", message: "This feature is taking a short break. Please try again later." },
+    { status: 503, headers: { "Cache-Control": "no-store" } },
+  );
+}
 
 export async function rateLimit(id: string, limit: number, windowSeconds: number) {
   const bucket = Math.floor(Date.now() / 1000 / windowSeconds);
-  const key = `rl:${id}:${bucket}`;
-  const count = await store.incr(key);
-  if (count === 1) await store.expire(key, windowSeconds);
+  const count = await store.incrExpire(`rl:${id}:${bucket}`, windowSeconds);
   const retryAfter = windowSeconds - (Math.floor(Date.now() / 1000) % windowSeconds);
   return { ok: count <= limit, remaining: Math.max(0, limit - count), retryAfter };
 }
 
+const IP_SHAPE = /^[0-9a-f:.]{3,45}$/i;
+
+/**
+ * Best-effort client IP for rate limiting and visitor hashing.
+ * Assumes Vercel: the platform overwrites x-forwarded-for / x-real-ip with the real client address,
+ * so a client cannot spoof them. Elsewhere, the first x-forwarded-for entry is client-controlled, so
+ * we take the last one (the address our own proxy saw). Values that don't look like an IP are ignored.
+ */
 export function clientIp(headers: Headers) {
-  return (
-    headers.get("x-real-ip") ??
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-    "local"
-  );
+  const xff = headers.get("x-forwarded-for")?.split(",").map((v) => v.trim()).filter(Boolean) ?? [];
+  const candidate = process.env.VERCEL
+    ? (headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ?? headers.get("x-real-ip") ?? xff[0])
+    : (headers.get("x-real-ip") ?? xff[xff.length - 1]);
+  return candidate && IP_SHAPE.test(candidate) ? candidate : "local";
 }
