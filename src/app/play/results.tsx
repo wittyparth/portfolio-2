@@ -246,7 +246,7 @@ export function Results({
           Same words again
         </button>
         <span className="ml-auto hidden text-xs text-muted-foreground sm:inline">
-          <kbd className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px]">tab</kbd> next test
+          <kbd className="rounded border border-border px-1.5 py-0.5 font-mono text-xs">tab</kbd> next test
         </span>
       </div>
     </div>

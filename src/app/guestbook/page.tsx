@@ -28,7 +28,7 @@ async function GuestbookData() {
 function Skeleton() {
   return (
     <div aria-hidden className="mt-10 space-y-4">
-      <div className="h-44 rounded-2xl border border-border bg-muted/40" />
+      <div className="h-52 animate-pulse rounded-xl bg-muted/40" />
       {[0, 1, 2].map((i) => (
         <div key={i} className="h-24 animate-pulse rounded-xl bg-muted/40" />
       ))}

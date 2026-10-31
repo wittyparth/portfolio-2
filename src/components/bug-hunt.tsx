@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { Bug } from "lucide-react";
 import { Particles, ParticlesEffect } from "@animate-ui/react/primitives/effects/particles";
@@ -135,6 +134,14 @@ export function BugHunt() {
         <span className="font-mono tabular-nums">{phase === "playing" ? `${(left / 1000).toFixed(1)}s` : `best ${best}`}</span>
       </div>
 
+      <p className="mb-3 min-h-5 text-sm text-pretty" aria-live="polite">
+        {phase === "done" ? (
+          score === 0 ? "The bugs won this round." : score >= best ? `New best: ${score} bugs squashed.` : `${score} bugs squashed.`
+        ) : phase === "idle" ? (
+          <span className="text-muted-foreground">20 seconds. Tap the bugs, or use the number keys 1–9.</span>
+        ) : null}
+      </p>
+
       <div className="mb-3 h-1 overflow-hidden rounded-full bg-muted" aria-hidden>
         <div className="h-full rounded-full bg-foreground transition-[width] duration-100 ease-linear" style={{ width: `${(left / ROUND_MS) * 100}%` }} />
       </div>
@@ -151,7 +158,7 @@ export function BugHunt() {
                 onPointerDown={() => hit(i)}
                 disabled={phase !== "playing"}
                 aria-label={hasBug ? "Bug here, squash it" : "Empty"}
-                className="relative grid aspect-square place-items-center rounded-xl border border-border bg-card transition-colors hover:bg-accent disabled:hover:bg-card"
+                className="relative grid aspect-square place-items-center rounded-xl border border-border bg-card transition-colors hover:bg-accent disabled:hover:bg-card disabled:opacity-60"
               >
                 <AnimatePresence>
                   {hasBug && (
@@ -169,52 +176,25 @@ export function BugHunt() {
                 {burst !== null && (
                   <Particles key={burst} animate className="pointer-events-none absolute inset-0 grid place-items-center">
                     <span />
-                    <ParticlesEffect count={10} radius={26} className="size-1.5 rounded-full bg-emerald-500" />
+                    <ParticlesEffect count={10} radius={26} className="size-1.5 rounded-full bg-foreground" />
                   </Particles>
                 )}
               </button>
             );
           })}
         </div>
+      </div>
 
-        <AnimatePresence>
-          {phase !== "playing" && (
-            <motion.div
-              initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
-              animate={{ opacity: 1, backdropFilter: "blur(6px)" }}
-              exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
-              className="absolute inset-0 grid place-items-center rounded-xl bg-background/70"
-            >
-              <div className="px-6 text-center">
-                {phase === "done" ? (
-                  <>
-                    <p className="text-lg font-medium">
-                      {score === 0 ? "The bugs won this round." : score >= best && score > 0 ? `New best: ${score} bugs squashed.` : `${score} bugs squashed.`}
-                    </p>
-                    <p className="mt-1 text-sm text-muted-foreground">Your best is {best}.</p>
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    20 seconds. Tap the bugs, or use the number keys 1–9.
-                  </p>
-                )}
-                <div className="mt-4 flex justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={start}
-                    autoFocus
-                    className="h-9 rounded-full bg-foreground px-4 text-sm font-medium text-background transition-opacity hover:opacity-90"
-                  >
-                    {phase === "done" ? "Play again" : "Start hunting"}
-                  </button>
-                  <Link href="/" className="inline-flex h-9 items-center rounded-full border border-border px-4 text-sm transition-colors hover:bg-accent">
-                    Take me home
-                  </Link>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      <div className="mt-4 flex h-9 justify-center">
+        {phase !== "playing" && (
+          <button
+            type="button"
+            onClick={start}
+            className="h-9 rounded-full border border-border px-4 text-sm font-medium transition-colors hover:bg-accent"
+          >
+            {phase === "done" ? "Play again" : "Start hunting"}
+          </button>
+        )}
       </div>
     </div>
   );

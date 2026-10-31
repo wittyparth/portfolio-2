@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function PlayPage() {
   return (
-    <main className="mx-auto w-full max-w-[48rem] px-6 pb-32">
+    <main className="mx-auto w-full max-w-[44rem] px-6 pb-32">
       <div className="mb-10">
         <PageHeader
           title="How fast do you type?"

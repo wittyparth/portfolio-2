@@ -51,7 +51,7 @@ export function TypeSettings({ className }: { className?: string }) {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" sideOffset={10} className="w-60 rounded-xl p-1.5">
-        <DropdownMenuLabel className="font-mono text-[10.5px] tracking-[0.14em] text-muted-foreground uppercase">Text size</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Text size</DropdownMenuLabel>
         <div className="flex items-center gap-2 px-2 pb-2">
           <button
             type="button"
@@ -63,7 +63,7 @@ export function TypeSettings({ className }: { className?: string }) {
             <Minus className="size-3.5" />
           </button>
           {/* Four steps, drawn as growing letters. */}
-          <div className="flex flex-1 items-end justify-center gap-2.5" role="radiogroup" aria-label="Text size">
+          <div className="flex flex-1 items-end justify-center gap-1" role="radiogroup" aria-label="Text size">
             {SIZES.map((s, n) => (
               <button
                 key={s}
@@ -72,7 +72,7 @@ export function TypeSettings({ className }: { className?: string }) {
                 aria-checked={s === size}
                 aria-label={SIZE_LABEL[s]}
                 onClick={() => set("size", s)}
-                className={cn("leading-none transition-colors", s === size ? "text-foreground" : "text-muted-foreground/60 hover:text-foreground")}
+                className={cn("grid min-h-7 min-w-6 place-items-center leading-none transition-colors", s === size ? "text-foreground" : "text-muted-foreground/60 hover:text-foreground")}
                 style={{ fontSize: 11 + n * 3 }}
               >
                 A
@@ -90,7 +90,7 @@ export function TypeSettings({ className }: { className?: string }) {
           </button>
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="font-mono text-[10.5px] tracking-[0.14em] text-muted-foreground uppercase">Font</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Font</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={font} onValueChange={(v) => set("font", v)}>
           {FONTS.map((f) => (
             <DropdownMenuRadioItem key={f.value} value={f.value} onSelect={(e) => e.preventDefault()} className="cursor-pointer rounded-lg py-2">

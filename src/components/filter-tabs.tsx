@@ -20,10 +20,10 @@ export function FilterTabs<T extends string>({
             <TabsHighlightItem key={o.value} value={o.value}>
               <TabsTrigger
                 value={o.value}
-                className="flex items-center gap-1.5 px-3 py-1 whitespace-nowrap text-muted-foreground transition-colors data-[state=active]:text-foreground"
+                className="flex min-h-7 items-center gap-1.5 px-3 py-1 whitespace-nowrap text-muted-foreground transition-colors data-[state=active]:text-foreground"
               >
                 {o.label}
-                {o.count !== undefined && <span className="font-mono text-[11px] tabular-nums opacity-60">{o.count}</span>}
+                {o.count !== undefined && <span className="font-mono text-[11px] tabular-nums opacity-70">{o.count}</span>}
               </TabsTrigger>
             </TabsHighlightItem>
           ))}

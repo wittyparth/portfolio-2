@@ -40,7 +40,7 @@ export function Leaderboard({
   const label = `${mode}s${set === "code" ? " · code" : ""}`;
 
   return (
-    <section aria-labelledby="board-title" className="mt-20">
+    <section aria-labelledby="board-title" className="mt-16 min-h-[22rem]">
       <div className="mb-4 flex items-baseline justify-between gap-4">
         <h2 id="board-title" className="text-lg font-medium tracking-tight">
           Leaderboard <span className="font-normal text-muted-foreground">· {label}</span>
@@ -66,19 +66,16 @@ export function Leaderboard({
         )}
 
         {state.status === "error" && (
-          <div className="rounded-xl border border-dashed border-border px-5 py-8 text-center text-sm text-muted-foreground">
+          <p className="py-8 text-center text-sm text-muted-foreground">
             The board didn&apos;t load.{" "}
             <button onClick={() => setAttempt((a) => a + 1)} className="text-foreground underline decoration-border underline-offset-4 hover:decoration-foreground">
               Try again
             </button>
-          </div>
+          </p>
         )}
 
         {state.status === "ready" && state.data.entries.length === 0 && (
-          <div className="rounded-xl border border-dashed border-border px-5 py-10 text-center">
-            <p className="text-sm">Nobody&apos;s on the {label} board yet.</p>
-            <p className="mt-1 text-sm text-muted-foreground">Finish a round and the top spot is yours.</p>
-          </div>
+          <p className="py-10 text-center text-[15px] text-muted-foreground">The {label} board is open. Finish a round and the top spot is yours.</p>
         )}
 
         {state.status === "ready" && state.data.entries.length > 0 && (

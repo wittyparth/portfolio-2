@@ -63,8 +63,8 @@ export function WordsView({ text, charsState, currIndex, typing, dimmed }: Props
   return (
     <div
       className={cn(
-        "relative h-[calc(3*2.25rem)] overflow-hidden font-mono text-[1.35rem] leading-9 transition-[filter,opacity] duration-300 select-none sm:h-[calc(3*2.75rem)] sm:text-[1.7rem] sm:leading-[2.75rem]",
-        dimmed && "opacity-40 blur-[3px]",
+        "relative h-[calc(3*2.25rem)] overflow-hidden font-mono text-[1.35rem] leading-9 transition-opacity duration-300 select-none sm:h-[calc(3*2.75rem)] sm:text-[1.7rem] sm:leading-[2.75rem]",
+        dimmed && "opacity-45",
       )}
       aria-hidden
     >
