@@ -14,25 +14,25 @@ type Node = Architecture["nodes"][number];
 type Edge = Architecture["edges"][number];
 
 const KIND: Record<Node["kind"], { icon: LucideIcon; label: string; tone: string }> = {
-  client: { icon: Monitor, label: "Client", tone: "text-emerald-600 dark:text-emerald-400" },
-  gateway: { icon: ShieldCheck, label: "Gateway", tone: "text-teal-600 dark:text-teal-400" },
-  service: { icon: Server, label: "Service", tone: "text-sky-600 dark:text-sky-400" },
-  worker: { icon: Cog, label: "Worker", tone: "text-amber-600 dark:text-amber-400" },
-  queue: { icon: Layers, label: "Queue", tone: "text-orange-600 dark:text-orange-400" },
-  scheduler: { icon: Clock, label: "Scheduler", tone: "text-amber-600 dark:text-amber-400" },
-  database: { icon: Database, label: "Database", tone: "text-indigo-600 dark:text-indigo-400" },
-  cache: { icon: Zap, label: "Cache", tone: "text-rose-600 dark:text-rose-400" },
-  "vector-db": { icon: Orbit, label: "Vector DB", tone: "text-fuchsia-600 dark:text-fuchsia-400" },
-  storage: { icon: HardDrive, label: "Storage", tone: "text-indigo-600 dark:text-indigo-400" },
-  llm: { icon: Sparkles, label: "LLM", tone: "text-violet-600 dark:text-violet-400" },
-  external: { icon: Globe, label: "External", tone: "text-neutral-500 dark:text-neutral-400" },
+  client: { icon: Monitor, label: "Client", tone: "text-emerald-700 dark:text-emerald-400" },
+  gateway: { icon: ShieldCheck, label: "Gateway", tone: "text-teal-700 dark:text-teal-400" },
+  service: { icon: Server, label: "Service", tone: "text-sky-700 dark:text-sky-400" },
+  worker: { icon: Cog, label: "Worker", tone: "text-amber-700 dark:text-amber-400" },
+  queue: { icon: Layers, label: "Queue", tone: "text-orange-700 dark:text-orange-400" },
+  scheduler: { icon: Clock, label: "Scheduler", tone: "text-amber-700 dark:text-amber-400" },
+  database: { icon: Database, label: "Database", tone: "text-indigo-700 dark:text-indigo-400" },
+  cache: { icon: Zap, label: "Cache", tone: "text-rose-700 dark:text-rose-400" },
+  "vector-db": { icon: Orbit, label: "Vector DB", tone: "text-fuchsia-700 dark:text-fuchsia-400" },
+  storage: { icon: HardDrive, label: "Storage", tone: "text-indigo-700 dark:text-indigo-400" },
+  llm: { icon: Sparkles, label: "LLM", tone: "text-violet-700 dark:text-violet-400" },
+  external: { icon: Globe, label: "External", tone: "text-neutral-600 dark:text-neutral-400" },
 };
 
 // Layout, in px. The diagram is drawn at the container's width (never narrower than MIN_W; it scrolls below that).
 const MIN_W = 640;
-const HEAD = 40;
-const NODE_H = 58;
-const ROW = 84;
+const HEAD = 44;
+const NODE_H = 64;
+const ROW = 92;
 const PAD_X = 8;
 
 type Box = { x: number; y: number; w: number; h: number; cx: number; cy: number; col: number };
@@ -76,13 +76,13 @@ function NodeIcon({ node }: { node: Node }) {
   const t = node.tech ? tech(node.tech) : null;
   if (t?.path) {
     return (
-      <svg viewBox="0 0 24 24" className="size-3.5" fill="currentColor" aria-hidden>
+      <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden>
         <path d={t.path} />
       </svg>
     );
   }
   const Icon = KIND[node.kind].icon;
-  return <Icon className="size-3.5" aria-hidden />;
+  return <Icon className="size-4" aria-hidden />;
 }
 
 export function ArchitectureDiagram({ data, compact = false }: { data: Architecture; compact?: boolean }) {
@@ -140,7 +140,7 @@ export function ArchitectureDiagram({ data, compact = false }: { data: Architect
         {data.title && !compact && (
           <figcaption className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
             <span className="text-sm font-medium">{data.title}</span>
-            <span className="hidden items-center gap-3 font-mono text-[10.5px] text-muted-foreground sm:flex">
+            <span className="hidden items-center gap-3 text-xs text-muted-foreground sm:flex">
               <span className="flex items-center gap-1.5"><span className="h-px w-4 bg-foreground/50" />request</span>
               <span className="flex items-center gap-1.5"><span className="w-4 border-t border-dashed border-foreground/50" />async</span>
               <span className="flex items-center gap-1.5"><span className="w-4 border-t-2 border-dotted border-sky-500" />stream</span>
@@ -162,7 +162,7 @@ export function ArchitectureDiagram({ data, compact = false }: { data: Architect
                 className={cn("absolute top-0 bottom-0 border-border/70", i > 0 && "border-l border-dashed", i % 2 === 1 && "bg-muted/25")}
                 style={{ left: i * laneW, width: laneW }}
               >
-                <p className="px-3 pt-3 font-mono text-[10px] tracking-[0.14em] text-muted-foreground uppercase">{l.label}</p>
+                <p className="px-3 pt-3 text-xs font-medium text-muted-foreground">{l.label}</p>
               </div>
             ))}
 
@@ -213,7 +213,7 @@ export function ArchitectureDiagram({ data, compact = false }: { data: Architect
               e.label ? (
                 <span
                   key={`l${e.i}`}
-                  className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border bg-background px-2 py-0.5 font-mono text-[10px] whitespace-nowrap text-foreground shadow-sm"
+                  className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-full border border-border bg-background px-2 py-0.5 font-mono text-[11px] whitespace-nowrap text-foreground shadow-sm"
                   style={{ left: e.mx, top: e.my }}
                 >
                   {e.label}
@@ -250,12 +250,12 @@ export function ArchitectureDiagram({ data, compact = false }: { data: Architect
                   )}
                   style={{ left: b.x, top: b.y, width: b.w, height: b.h }}
                 >
-                  <span className={cn("grid size-6 shrink-0 place-items-center rounded-md border border-border bg-muted/50", kind.tone)}>
+                  <span className={cn("grid size-7 shrink-0 place-items-center rounded-md border border-border bg-muted/50", kind.tone)}>
                     <NodeIcon node={n} />
                   </span>
                   <span className="min-w-0 leading-tight">
-                    <span className="line-clamp-2 text-[11.5px] font-medium [overflow-wrap:anywhere]">{n.label}</span>
-                    <span className="mt-0.5 block truncate font-mono text-[9.5px] text-muted-foreground uppercase">
+                    <span className="line-clamp-2 text-[13px] leading-[1.25] font-medium [overflow-wrap:anywhere]">{n.label}</span>
+                    <span className="mt-0.5 block truncate font-mono text-[11px] text-muted-foreground">
                       {n.tech ?? kind.label}
                     </span>
                   </span>
@@ -271,14 +271,14 @@ export function ArchitectureDiagram({ data, compact = false }: { data: Architect
             <div>
               <p className="flex flex-wrap items-baseline gap-x-2">
                 <span className="font-medium">{focus.label}</span>
-                <span className={cn("font-mono text-[10.5px] uppercase", KIND[focus.kind].tone)}>{KIND[focus.kind].label}</span>
-                {focus.tech && <span className="font-mono text-[10.5px] text-muted-foreground uppercase">· {focus.tech}</span>}
+                <span className={cn("text-xs font-medium", KIND[focus.kind].tone)}>{KIND[focus.kind].label}</span>
+                {focus.tech && <span className="font-mono text-xs text-muted-foreground">· {focus.tech}</span>}
               </p>
               {focus.note && <p className="mt-1 text-pretty text-muted-foreground">{focus.note}</p>}
               {focusLinks.length > 0 && (
                 <p className="mt-2 flex flex-wrap gap-1.5">
                   {focusLinks.map((l, i) => (
-                    <span key={i} className="rounded-full border border-border px-2 py-0.5 font-mono text-[10.5px] text-muted-foreground">
+                    <span key={i} className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
                       {l.dir} {l.other.label}
                       {l.label && <span className="opacity-60"> · {l.label}</span>}
                     </span>

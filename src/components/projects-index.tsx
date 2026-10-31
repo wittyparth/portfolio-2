@@ -1,29 +1,35 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import Link from "next/link";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { flushSync } from "react-dom";
 import { CursorContainer, CursorFollow, CursorProvider } from "@animate-ui/react/primitives/cursor";
 import { Highlight, HighlightItem } from "@animate-ui/react/primitives/effects/highlight";
 import { AnimateIcon } from "@animate-ui/react/icons";
 import { ArrowRight } from "@/components/animate-ui/icons/arrow-right";
 import { LayoutDashboard } from "@/components/animate-ui/icons/layout-dashboard";
 import { List } from "@/components/animate-ui/icons/list";
-import { Rows3 } from "lucide-react";
+import { ChevronDown, Rows3 } from "lucide-react";
 import type { Project } from "@/lib/projects";
 import { techKey } from "@/lib/tech";
 import { cn } from "@/lib/utils";
 import { FilterTabs } from "./filter-tabs";
+import { Cover } from "./project-media";
 import { ProjectEntry } from "./project-entry";
 import { LogoStack, ProjectTable } from "./project-table";
 import { ViewToggle } from "./view-toggle";
 import { TechLogo } from "./tech-logo";
-import { CountingNumber } from "@animate-ui/react/primitives/texts/counting-number";
 import { Tip } from "./tip";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type Status = Project["status"] | "all";
 type View = "list" | "grid" | "table";
+
+/** Shared-element name for a project's title, so it glides between List, Grid and Table. */
+export const vtName = (slug: string) => `pt-${slug}`;
 
 export const STATUS_DOT: Record<Project["status"], string> = {
   building: "bg-amber-500",
@@ -59,6 +65,7 @@ function useStackOptions(projects: Project[]) {
   }, [projects]);
 }
 
+/** One compact control: shows the chosen technology (logo and name), or "Stack" when nothing is chosen. */
 function StackFilter({
   options, value, onChange,
 }: {
@@ -66,32 +73,33 @@ function StackFilter({
   value: string | null;
   onChange: (k: string | null) => void;
 }) {
+  const current = options.find((o) => o.key === value);
   return (
-    <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Filter by technology">
-      <span className="mr-2 font-mono text-[11px] tracking-[0.12em] text-muted-foreground uppercase">Stack</span>
-      {options.map((o) => {
-        const on = value === o.key;
-        return (
-          <Tip key={o.key} label={`${o.name} · ${o.n}`}>
-            <button
-              type="button"
-              aria-pressed={on}
-              aria-label={`Only projects using ${o.name}`}
-              onClick={() => onChange(on ? null : o.key)}
-              className={cn(
-                "group/f grid h-8 min-w-8 place-items-center rounded-full border px-2 text-muted-foreground transition-colors",
-                on ? "border-foreground/40 bg-accent" : "border-transparent hover:bg-accent",
-              )}
-            >
-              <TechLogo
-                name={o.name}
-                className={cn("transition-[filter,opacity] duration-200", !on && "opacity-60 grayscale group-hover/f:opacity-100 group-hover/f:grayscale-0")}
-              />
-            </button>
-          </Tip>
-        );
-      })}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label={current ? `Technology: ${current.name}` : "Filter by technology"}
+        className={cn(
+          "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+          current ? "border-foreground/40 bg-accent text-foreground" : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",
+        )}
+      >
+        {current ? <TechLogo name={current.name} /> : null}
+        {current ? current.name : "Stack"}
+        <ChevronDown className="size-3.5 opacity-60" aria-hidden />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-h-80 min-w-48">
+        <DropdownMenuRadioGroup value={value ?? "all"} onValueChange={(v) => onChange(v === "all" ? null : v)}>
+          <DropdownMenuRadioItem value="all">Any technology</DropdownMenuRadioItem>
+          {options.map((o) => (
+            <DropdownMenuRadioItem key={o.key} value={o.key}>
+              <TechLogo name={o.name} />
+              {o.name}
+              <span className="ml-auto pr-2 font-mono text-[11px] text-muted-foreground tabular-nums">{o.n}</span>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -118,7 +126,7 @@ function IndexList({ projects }: { projects: Project[] }) {
                         <span className={cn("self-start pt-px font-mono text-sm text-muted-foreground tabular-nums", !showYear && "opacity-0")}>{p.year}</span>
                         <span className="min-w-0">
                           <span className="flex items-center gap-2 text-[15px] font-medium">
-                            {p.name}
+                            <span style={{ viewTransitionName: vtName(p.slug) }}>{p.name}</span>
                             <StatusDot status={p.status} />
                           </span>
                           <span className="mt-0.5 block truncate text-sm text-muted-foreground">{p.tagline}</span>
@@ -146,7 +154,7 @@ function IndexList({ projects }: { projects: Project[] }) {
                   transition={{ type: "spring", stiffness: 320, damping: 28 }}
                   className="w-64 overflow-hidden rounded-lg border border-border bg-card shadow-[0_24px_48px_-16px_rgb(0_0_0/0.35)]"
                 >
-                  <Image src={hovered.cover} alt="" width={512} height={320} className="aspect-[16/10] w-full object-cover" />
+                  <Cover src={hovered.cover} placeholder={hovered.placeholder} width={512} height={320} sizes="256px" />
                 </motion.div>
               )}
             </AnimatePresence>
@@ -168,13 +176,13 @@ function Grid({ projects }: { projects: Project[] }) {
           >
             <div className="overflow-hidden border-b border-border bg-muted">
               {p.cover ? (
-                <Image
+                <Cover
                   src={p.cover}
-                  alt=""
+                  placeholder={p.placeholder}
                   width={800}
                   height={500}
-                  sizes="(min-width: 640px) 22rem, 100vw"
-                  className="aspect-[16/10] w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]"
+                  sizes="(min-width: 768px) 340px, calc(100vw - 3rem)"
+                  imgClassName="transition-transform duration-500 ease-out group-hover:scale-[1.03]"
                 />
               ) : (
                 <div className="aspect-[16/10]" />
@@ -182,7 +190,7 @@ function Grid({ projects }: { projects: Project[] }) {
             </div>
             <div className="flex flex-1 flex-col p-4">
               <p className="flex items-center gap-2 font-medium tracking-tight">
-                {p.name}
+                <span style={{ viewTransitionName: vtName(p.slug) }}>{p.name}</span>
                 <span className="ml-auto font-mono text-xs font-normal text-muted-foreground">{p.year}</span>
               </p>
               <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">{p.tagline}</p>
@@ -201,43 +209,22 @@ function Grid({ projects }: { projects: Project[] }) {
   );
 }
 
-/** The shelf at a glance: totals that count up once, separated by hairlines. */
-function Stats({ projects }: { projects: Project[] }) {
-  const tools = new Set(projects.flatMap((p) => p.stack.map(techKey))).size;
-  const years = projects.map((p) => Number(p.year));
-  const ongoing = projects.some((p) => p.status === "building");
-  const items = [
-    { n: projects.length, label: "Projects" },
-    { n: projects.filter((p) => p.status === "shipped").length, label: "Shipped" },
-    { n: projects.filter((p) => p.status === "building").length, label: "Building" },
-    { n: tools, label: "Tools used" },
-  ];
-  return (
-    <dl className="mt-10 grid grid-cols-2 gap-y-5 sm:grid-cols-[repeat(4,1fr)_auto] sm:divide-x sm:divide-border">
-      {items.map((s) => (
-        <div key={s.label} className="sm:px-5 sm:first:pl-0">
-          <dt className="font-mono text-[10.5px] tracking-[0.14em] text-muted-foreground uppercase">{s.label}</dt>
-          <dd className="mt-1 text-3xl font-medium tracking-tight tabular-nums">
-            <CountingNumber number={s.n} inView inViewOnce />
-          </dd>
-        </div>
-      ))}
-      <div className="col-span-2 sm:col-span-1 sm:pl-5">
-        <dt className="font-mono text-[10.5px] tracking-[0.14em] text-muted-foreground uppercase">Since</dt>
-        <dd className="mt-1 flex items-baseline gap-1.5 text-3xl font-medium tracking-tight tabular-nums">
-          {Math.min(...years)}
-          <span className="text-sm font-normal text-muted-foreground">→ {ongoing ? "now" : Math.max(...years)}</span>
-        </dd>
-      </div>
-    </dl>
-  );
-}
-
 export function ProjectsIndex({ projects }: { projects: Project[] }) {
   const [status, setStatus] = React.useState<Status>("all");
   const [stack, setStack] = React.useState<string | null>(null);
   const [view, setView] = React.useState<View>("list");
   const stackOptions = useStackOptions(projects);
+  const reduce = useReducedMotion();
+
+  // Swap views inside a View Transition so each project's title glides to its new place. No-op without support or with reduced motion.
+  const changeView = (next: View) => {
+    if (next === view) return;
+    const start = typeof document !== "undefined" && !reduce && "startViewTransition" in document
+      ? (document as Document & { startViewTransition: (cb: () => void) => unknown }).startViewTransition.bind(document)
+      : null;
+    if (start) start(() => flushSync(() => setView(next)));
+    else setView(next);
+  };
 
   const filtered = projects.filter(
     (p) => (status === "all" || p.status === status) && (!stack || p.stack.some((s) => techKey(s) === stack)),
@@ -249,8 +236,7 @@ export function ProjectsIndex({ projects }: { projects: Project[] }) {
 
   return (
     <div>
-      <Stats projects={projects} />
-      <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-6">
+      <div className="mt-10 flex flex-wrap items-center gap-x-3 gap-y-3 border-t border-border pt-6">
         <FilterTabs
           label="Filter by status"
           value={status}
@@ -262,28 +248,26 @@ export function ProjectsIndex({ projects }: { projects: Project[] }) {
               .map((s) => ({ value: s, label: s[0].toUpperCase() + s.slice(1), count: count(s) })),
           ]}
         />
-        <ViewToggle
-          value={view}
-          onChange={setView}
-          views={[
-            { value: "list", label: "List", icon: <List size={14} /> },
-            { value: "grid", label: "Grid", icon: <LayoutDashboard size={14} /> },
-            { value: "table", label: "Table", icon: <Rows3 className="size-3.5" /> },
-          ]}
-        />
-      </div>
-      <div className="mt-4 flex items-center gap-3">
-        <StackFilter options={stackOptions} value={stack} onChange={setStack} />
-        {stack && (
-          <button type="button" onClick={() => setStack(null)} className="shrink-0 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">
-            Clear
-          </button>
-        )}
+        {stackOptions.length > 0 && <StackFilter options={stackOptions} value={stack} onChange={setStack} />}
+        <div className="ml-auto">
+          <ViewToggle
+            value={view}
+            onChange={changeView}
+            views={[
+              { value: "list", label: "List", icon: <List size={14} /> },
+              { value: "grid", label: "Grid", icon: <LayoutDashboard size={14} /> },
+              { value: "table", label: "Table", icon: <Rows3 className="size-3.5" /> },
+            ]}
+          />
+        </div>
       </div>
 
       {filtered.length === 0 && (
-        <p className="mt-12 text-muted-foreground">
-          No projects match that. <button type="button" className="underline underline-offset-4 hover:text-foreground" onClick={() => { setStatus("all"); setStack(null); }}>Show everything</button>
+        <p className="mt-12 text-muted-foreground" role="status">
+          Nothing matches that combination.{" "}
+          <button type="button" className="inline-flex min-h-6 items-center underline underline-offset-4 hover:text-foreground" onClick={() => { setStatus("all"); setStack(null); }}>
+            Show every project
+          </button>
         </p>
       )}
 
@@ -295,7 +279,7 @@ export function ProjectsIndex({ projects }: { projects: Project[] }) {
         <>
           {featured.length > 0 && (
             <section className="mt-10" aria-labelledby="featured-heading">
-              <h2 id="featured-heading" className="mb-5 font-mono text-[11px] tracking-[0.12em] text-muted-foreground uppercase">Featured</h2>
+              <h2 id="featured-heading" className="mb-5 text-sm font-medium text-muted-foreground">Featured</h2>
               <div className="space-y-6">
                 {featured.map((p) => <ProjectEntry key={p.slug} project={p} />)}
               </div>
@@ -303,7 +287,7 @@ export function ProjectsIndex({ projects }: { projects: Project[] }) {
           )}
           {rest.length > 0 && (
             <section className="mt-14" aria-labelledby="index-heading">
-              <h2 id="index-heading" className="mb-3 font-mono text-[11px] tracking-[0.12em] text-muted-foreground uppercase">
+              <h2 id="index-heading" className="mb-3 text-sm font-medium text-muted-foreground">
                 {filtering ? `${rest.length} ${rest.length === 1 ? "project" : "projects"}` : "Everything else"}
               </h2>
               <IndexList projects={rest} />

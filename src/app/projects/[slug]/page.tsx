@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { mdxComponents } from "@/mdx-components";
 import { ArchitectureDiagram } from "@/components/architecture-diagram";
-import { SplittingText } from "@animate-ui/react/primitives/texts/splitting";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { ArticleLayout } from "@/components/article-layout";
 import { BackLink } from "@/components/page-header";
 import { BrandIcon } from "@/components/brand-icon";
-import { ProjectMedia } from "@/components/project-media";
+import { Cover, ProjectMedia } from "@/components/project-media";
 import { TechIcon } from "@/components/tech-icons";
 import { getProject, getProjects, type Project } from "@/lib/projects";
 import { parseArchitecture } from "@/lib/architecture";
@@ -49,21 +48,22 @@ function NextProject({ project, label }: { project: Project; label: string }) {
     >
       {project.cover && (
         <div className="w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-muted sm:w-36">
-          <Image
+          <Cover
             src={project.cover}
-            alt=""
+            placeholder={project.placeholder}
             width={288}
             height={180}
-            className="aspect-[16/10] w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.05]"
+            sizes="(min-width: 640px) 144px, 112px"
+            imgClassName="transition-transform duration-500 ease-out group-hover:scale-[1.05]"
           />
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <span className="text-xs text-muted-foreground">{label}</span>
+        <span className="text-sm text-muted-foreground">{label}</span>
         <p className="mt-0.5 text-lg font-semibold tracking-tight">{project.name}</p>
         <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">{project.tagline}</p>
       </div>
-      <span aria-hidden className="text-muted-foreground transition-transform duration-200 group-hover:translate-x-1">→</span>
+      <ArrowRight aria-hidden className="size-4 text-muted-foreground transition-transform duration-200 group-hover:translate-x-1" />
     </Link>
   );
 }
@@ -103,8 +103,8 @@ export default async function ProjectPage({ params }: PageProps<"/projects/[slug
       header={
         <header className="pt-16 sm:pt-20">
           <BackLink href="/projects" label="Projects" />
-          <h1 className="mt-6 text-[2.25rem] leading-[1.1] font-semibold tracking-[-0.03em] sm:text-[2.75rem]">
-            <SplittingText text={project.name} type="chars" stagger={0.03} />
+          <h1 className="mt-6 animate-in fade-in slide-in-from-bottom-2 text-[2.25rem] leading-[1.1] font-semibold tracking-[-0.03em] text-balance duration-500 fill-mode-both motion-reduce:animate-none sm:text-[2.75rem]">
+            {project.name}
           </h1>
           <p className="mt-4 text-[17px] leading-relaxed text-pretty text-muted-foreground">{project.tagline}</p>
 
@@ -112,7 +112,7 @@ export default async function ProjectPage({ params }: PageProps<"/projects/[slug
             <div className="mt-6 flex flex-wrap gap-2">
               {project.live && (
                 <a href={project.live} target="_blank" rel="noreferrer" className={cn(pill, "border-foreground bg-foreground text-background hover:bg-foreground/85")}>
-                  Visit live site <span aria-hidden>↗</span>
+                  Visit live site <ArrowUpRight className="size-4" aria-hidden />
                 </a>
               )}
               {project.repo && (
@@ -127,12 +127,12 @@ export default async function ProjectPage({ params }: PageProps<"/projects/[slug
           <dl className="mt-10 grid grid-cols-2 gap-x-6 gap-y-5 border-y border-border py-5 text-sm sm:grid-cols-4">
             {glance.map((g) => (
               <div key={g.label} className="min-w-0">
-                <dt className="font-mono text-[11px] tracking-[0.12em] text-muted-foreground uppercase">{g.label}</dt>
+                <dt className="text-xs text-muted-foreground">{g.label}</dt>
                 <dd className="mt-1.5 text-pretty">{g.value}</dd>
               </div>
             ))}
             <div className="col-span-full">
-              <dt className="font-mono text-[11px] tracking-[0.12em] text-muted-foreground uppercase">Built with</dt>
+              <dt className="text-xs text-muted-foreground">Built with</dt>
               <dd className="mt-2 flex flex-wrap gap-x-4 gap-y-2">
                 {project.stack.map((s) => (
                   <span key={s} className="inline-flex items-center gap-1 text-sm">
