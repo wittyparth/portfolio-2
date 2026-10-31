@@ -1,14 +1,20 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import { PageHeader } from "@/components/page-header";
 import { BlogIndex } from "@/components/blog-index";
 import { getPosts } from "@/lib/blog";
-import { profile } from "@/lib/content";
 
-export const metadata: Metadata = {
-  title: `Writing · ${profile.name}`,
-  description: "Notes on building AI agents, the APIs they call, and making software people can trust.",
-  alternates: { types: { "application/rss+xml": "/rss.xml" } },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  "use cache";
+  // Placeholder posts are not real writing yet; keep the index out of search until at least one post is real.
+  const real = getPosts().some((p) => !p.placeholder);
+  return pageMetadata({
+    title: "Writing · Partha Saradhi",
+    description: "Notes on building AI agents, the APIs they call, and making software people can trust.",
+    path: "/blog",
+  noindex: !real,
+  });
+}
 
 export default function BlogPage() {
   const posts = getPosts().map(({ slug, title, summary, date, type, tags, pinned, minutes }) => ({ slug, title, summary, date, type, tags, pinned, minutes }));

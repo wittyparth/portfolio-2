@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import { PageHeader } from "@/components/page-header";
 import { UsesList } from "@/components/uses-list";
 import { Soundtrack } from "@/components/soundtrack";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Uses · Partha Saradhi",
-  description: "The hardware, software and small rituals Partha works with.",
-};
+  description: "The hardware, software and small rituals Partha Saradhi works with day to day.",
+  path: "/uses",
+});
 
 export default function UsesPage() {
   return (

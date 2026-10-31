@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import { PageHeader } from "@/components/page-header";
 import { FilmRoll } from "@/components/film-roll";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Off the clock · Partha Saradhi",
-  description: "What Partha gets up to when the laptop is closed.",
-};
+  description: "What Partha Saradhi gets up to when the laptop is closed.",
+  path: "/life",
+});
 
 export default function LifePage() {
   return (

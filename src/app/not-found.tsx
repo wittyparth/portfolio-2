@@ -4,6 +4,7 @@ import { BugHunt } from "@/components/bug-hunt";
 
 export const metadata: Metadata = {
   title: "Page not found · Partha Saradhi",
+  robots: { index: false, follow: false },
 };
 
 export default function NotFound() {

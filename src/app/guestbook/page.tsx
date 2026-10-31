@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { store } from "@/lib/store";
@@ -6,10 +7,11 @@ import { listEntries, issueToken } from "../api/guestbook/guestbook-server";
 import { Guestbook } from "./guestbook";
 import { PageHeader } from "@/components/page-header";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Guestbook · Partha Saradhi",
   description: "Leave a note for Partha: say hi, share a thought, or share what you're building.",
-};
+  path: "/guestbook",
+});
 
 async function GuestbookData() {
   await connection();

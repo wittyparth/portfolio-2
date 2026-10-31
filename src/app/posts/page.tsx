@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import { PageHeader } from "@/components/page-header";
 import { SocialWall } from "@/components/social-wall";
 import { socialPosts } from "@content/social";
-import { profile } from "@/lib/content";
 
-export const metadata: Metadata = {
-  title: `Posts · ${profile.name}`,
-  description: "Shorter thoughts from X and LinkedIn, collected in one place.",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Posts · Partha Saradhi",
+  description: "Shorter thoughts from X and LinkedIn by Partha Saradhi, collected in one place.",
+  path: "/posts",
+});
 
 export default function PostsPage() {
   return (

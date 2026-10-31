@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import { TypingGame } from "./typing-game";
 import { PageHeader } from "@/components/page-header";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Typing test · Partha Saradhi",
   description: "A small typing speed test with a public leaderboard. 15, 30 or 60 seconds, plain words or code.",
-};
+  path: "/play",
+});
 
 export default function PlayPage() {
   return (

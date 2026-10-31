@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import { PageHeader } from "@/components/page-header";
 import { ProjectsIndex } from "@/components/projects-index";
 import { getProjects } from "@/lib/projects";
-import { profile } from "@/lib/content";
 
-export const metadata: Metadata = {
-  title: `Projects · ${profile.name}`,
-  description: "Things Partha has built: AI agents, developer tools and the odd weekend experiment.",
-};
+export const metadata: Metadata = pageMetadata({
+  title: "Projects · Partha Saradhi",
+  description: "Projects by Partha Saradhi Munakala: AI agents, developer tools and weekend experiments, each with a write-up of what was built and learned.",
+  path: "/projects",
+});
 
 export default function ProjectsPage() {
   // Headings are only needed on the case study page; keep the client payload small.
