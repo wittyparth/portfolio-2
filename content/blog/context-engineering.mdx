@@ -1,0 +1,231 @@
+---
+title: "Context Engineering: Why the Window Beats the Prompt"
+summary: "What context engineering is, how it differs from prompt engineering, and how to select, order and compress what goes in the window, plus a checklist."
+date: 2026-10-10
+type: essay
+tags: [context-engineering, llm, agents, rag]
+pinned: false
+placeholder: false
+---
+
+Context engineering is the work of deciding what information goes into a model's context window on each call, and in what form: instructions, tool definitions, retrieved documents, conversation history, memory and state. It matters more than prompt wording because a model can only reason over what it can see. Most agent failures I run into are not a bad sentence in the system prompt. They are the wrong thing in the window, or the right thing buried.
+
+The phrase caught on in mid-2025, with Shopify's Tobi Lutke and Andrej Karpathy among those who argued it describes the real job better than "prompt engineering", and Anthropic published an engineering post framing it as curating the smallest set of high-signal tokens. I am not claiming the idea as mine. I am writing down how I think about it. If you have not read the previous post, [prompt engineering that holds up in production](/blog/prompt-engineering) covers the single-prompt craft this one builds on.
+
+## What is context engineering, and how is it different from prompt engineering?
+
+Prompt engineering is about how you phrase one instruction. Context engineering is about assembling everything the model sees across a whole run, including parts that change every turn.
+
+A one-shot task, like classifying a single email, is mostly a prompt problem. An agent that loops over tools, reads documents and talks to a user for twenty turns is a context problem, because the window is rebuilt (or grows) on every step and something has to decide what is in it. The prompt becomes one component among several.
+
+Here is how I split the window:
+
+| Part | What it is | Typical failure |
+| --- | --- | --- |
+| System instructions | Role, rules, output format | Bloated, contradictory, or stale |
+| Tool definitions | Names, descriptions, parameter schemas | Too many, or vague descriptions |
+| Retrieved documents | Search or RAG results | Irrelevant chunks, or too many |
+| Conversation history | Earlier turns | Grows until it drowns the task |
+| Memory | Facts kept across sessions | Wrong or outdated facts |
+| State | Task progress, scratchpad, tool results | Raw dumps instead of the useful part |
+
+None of these is free. Each costs tokens, latency and money, and each competes for the model's attention.
+
+## Why does a bigger context window not solve the problem?
+
+Because a model's accuracy depends on what is in the window, not just on whether it fits. Longer windows let you stuff more in, but more is not better.
+
+The best-known evidence is the "Lost in the Middle" paper (Liu et al., 2023). They tested models on multi-document question answering and key-value retrieval, and found performance was often best when the relevant information was at the start or end of the input, and worse when it sat in the middle. Newer models have improved on this particular test, but the underlying lesson stands: position and surrounding noise affect results, so you should measure on your own task instead of assuming a long window is used evenly.
+
+Two practical points follow:
+
+- **Every token is attended to**, so irrelevant tokens are not neutral. They add noise, cost and latency.
+- **Limits are not the target.** A window that is 90 percent full of marginal material will usually do worse than one that is 20 percent full of the right material.
+
+I treat the window as a budget to be spent, not a space to be filled.
+
+## How do I select the right context?
+
+Retrieve less, and make it better. Selection is the highest-leverage step, because nothing downstream can fix a window that never contained the answer, and nothing can fully recover from a window full of distractors.
+
+What I try, in order:
+
+1. **Start from the question.** Ask what the model needs to answer this specific step, not what might be useful.
+2. **Filter before you rank.** Use metadata (tenant, date, document type, permissions) to cut candidates deterministically, then use semantic search on what is left.
+3. **Retrieve a few, rerank, keep fewer.** Pull a wider candidate set, rerank, and pass only the top few.
+4. **Pick by usefulness, not similarity alone.** The closest chunk to the query is not always the one that helps. Near-duplicates waste space.
+5. **Make the model ask.** Give it a search tool instead of pre-loading everything. Just-in-time retrieval lets the model pull what it needs when it needs it, at the cost of extra round trips.
+
+This is the area where my work on [NL2SQL](/projects/nl2sql) fits. A database can have hundreds of tables, and putting the whole schema in the prompt is both expensive and confusing. Narrowing to the relevant tables and columns first, then generating SQL against just those, is a context decision before it is a model decision.
+
+## How do I order context so the model uses it?
+
+Put the content that matters most where it is least likely to be ignored, and keep the structure predictable.
+
+- **Long documents first, question last.** Placing the query at the end of a long input tends to work better than leading with it. Anthropic's guidance on long-context prompts says the same.
+- **Keep the highest-ranked retrieved items at the edges.** If you pass ten chunks, avoid burying the best one in position five.
+- **Label everything.** Wrap each source in tags with an id and a title, so the model can cite and so you can debug.
+- **Keep stable content at the front, volatile content at the back.** Besides being tidy, this lets prompt caching work where a provider supports it, since caching generally depends on an unchanged prefix. That can cut both cost and latency.
+
+```text title="a labelled, ordered context (plain prompt text)"
+<instructions>
+You answer questions about the customer's account using only the documents below.
+If the documents do not contain the answer, say so.
+</instructions>
+
+<documents>
+  <document id="d1" title="Refund policy">...</document>
+  <document id="d2" title="Plan limits">...</document>
+</documents>
+
+<conversation_summary>
+The user is on the Team plan and asked about downgrading last week.
+</conversation_summary>
+
+<question>Can I get a refund if I downgrade mid-month?</question>
+```
+
+## How do I compress and summarise context?
+
+Compress what has been used, keep what is still needed, and be careful about what you throw away. Long conversations and long tool outputs are where windows quietly bloat.
+
+Options, from cheap to expensive:
+
+- **Trim tool outputs.** An API call that returns 400 fields when the next step needs three should be reduced in code before the model sees it. This is the easiest win in most agents.
+- **Clear old tool results.** Once a result has been used, its raw form rarely needs to stay in the window.
+- **Sliding window.** Keep the last N turns verbatim.
+- **Rolling summary.** Summarise older turns into a short note, and keep recent turns verbatim.
+- **Structured notes.** Have the agent maintain a small scratchpad (goal, decisions, open questions) outside the window and re-read it when needed.
+
+Summaries lose information, and the loss is silent. If a detail might matter later, like an exact error code, an ID or a user's stated constraint, extract it into structured state instead of trusting a paragraph to preserve it. A good habit is to summarise with a specific instruction about what must survive.
+
+```python title="compaction sketch (generic pseudo-code for the model call)"
+def compact(history: list[dict], keep_last: int = 6) -> list[dict]:
+    if len(history) <= keep_last:
+        return history
+    old, recent = history[:-keep_last], history[-keep_last:]
+    summary = call_llm(
+        "Summarise this conversation for the assistant's own later use. "
+        "Preserve: user goals, decisions made, exact IDs and numbers, open questions. "
+        "Drop: pleasantries and repeated attempts.\n\n" + render(old)
+    )
+    return [{"role": "user", "content": f"Summary of earlier conversation:\n{summary}"}] + recent
+```
+
+## Why are tool descriptions part of the context?
+
+Because the model chooses tools by reading their names and descriptions, and those descriptions sit in the window on every call. A tool description is a prompt, and tool definitions are often the largest fixed cost in an agent.
+
+Two problems show up repeatedly:
+
+- **Vague or overlapping descriptions** make the model pick the wrong tool or the wrong arguments. "Gets data" is not a description.
+- **Too many tools** bloat the window and make selection harder. If an agent has fifty tools and uses three per task, you are paying for and distracting the model with forty-seven.
+
+This is the thinking behind [MCPForge](/projects/mcpforge), which turns an OpenAPI spec into an MCP server. Specs are written for human developers: terse summaries, and parameter docs that assume you have read the rest of the API. As tools, they are a poor prompt. MCPForge rewrites the descriptions with a model so the tools say when to use them, not only what endpoint they hit.
+
+A good tool description says what the tool does, when to use it (and when not to), what the key arguments mean, and what it returns:
+
+```text title="a weak and a better tool description"
+Weak:
+  get_orders: Gets orders.
+
+Better:
+  get_orders: List a customer's orders, newest first. Use this to answer
+  questions about order status or history. Requires customer_id. Returns at
+  most 20 orders; use the page parameter for more. Do not use it to look up a
+  single order by id; use get_order for that.
+```
+
+Trimming the tool set per task, or exposing a small set of tools and letting the agent search for more, is a context optimisation as much as a design choice.
+
+## What is the difference between short-term and long-term memory?
+
+Short-term memory is what is in the window for this session. Long-term memory is information stored outside the window and brought back in when relevant.
+
+**Short-term:** the conversation so far, plus tool results and state. It is limited by the window, and managed by trimming and summarising as above.
+
+**Long-term:** facts, preferences and past outcomes persisted in a database or vector store. It splits into a few kinds that people borrow from cognitive science: facts about the user or domain, records of past events, and learned procedures or instructions.
+
+Long-term memory introduces its own questions, and I think they matter more than the storage choice:
+
+- **What gets written?** Saving everything creates noise. Save things that are stable and likely to be useful.
+- **When does it get read?** Loading all memories on every turn is just another way of stuffing the window. Retrieve the relevant ones.
+- **How does it get corrected?** Memories go stale. A wrong stored fact will be confidently repeated, so you need ways to update and delete it, and ideally to show users what is remembered.
+
+## How does multi-agent context isolation help?
+
+Splitting work across agents lets each one run with a small, focused window, and return only a condensed result to the coordinator. The benefit is isolation more than parallelism.
+
+A research subagent might read twenty pages and run a dozen searches. The orchestrator does not need any of that. It needs a half-page answer with sources. Handing the subagent its own window, then returning only the distilled output, keeps the orchestrator's context clean for the next decision.
+
+The costs are real. Multi-agent setups use more total tokens, and the handoff is a lossy interface: if the orchestrator's brief to the subagent leaves out something important, the subagent has no way to know. Write the brief the way you would for a contractor who cannot ask questions, and have the subagent return structured output. I would reach for a single agent with good context management first, and add subagents when a subtask is large, self-contained and noisy.
+
+## What changes for voice agents, where latency matters?
+
+In voice, context size is a latency problem before it is a quality problem. Every token in the prompt adds time before the first word is spoken, and a pause of a second or two feels wrong in a phone call.
+
+I work on voice agents at Lyzr AI, and the things I keep in mind, which apply to [Voice Studio](/projects/voice-studio) style systems in general, are:
+
+- **Keep the system prompt short.** A voice agent's persona and rules need to be tight. Move detail into tools or retrieval so it only costs tokens when needed.
+- **Retrieve only on demand.** A retrieval step is a network round trip. Skip it for turns that do not need it, such as greetings and confirmations, and keep the knowledge base lookups for real questions.
+- **Prefer stable prefixes.** If your provider supports prompt caching, a stable prefix lets repeated turns skip reprocessing it.
+- **Use compact state.** Instead of replaying the full transcript, carry a few structured fields: what the caller wants, what has been confirmed, what is still needed.
+- **Mind the output as well.** Spoken replies should be short. Long answers cost generation time and also lose the listener.
+
+The trade-off is that lean context means less safety net. Test with real conversational messiness, such as interruptions and corrections, because that is where compact state breaks.
+
+## What are the failure modes of bad context?
+
+Drew Breunig named four of them, and I find the names useful for debugging. They are context poisoning, distraction, confusion and clash.
+
+- **Poisoning.** A wrong fact or hallucination enters the context, is treated as true, and gets reinforced in later steps. Mitigation: validate before writing to memory or state, and keep a way to roll back.
+- **Distraction.** The context grows so large that the model leans on its accumulated history instead of its instructions or its own reasoning. Mitigation: compress and prune.
+- **Confusion.** Superfluous content, often many tools or irrelevant documents, pushes the model toward the wrong action. Mitigation: select fewer tools and fewer documents per task.
+- **Clash.** Parts of the context contradict each other, such as an old summary saying one thing and a new tool result saying another, or two instructions that disagree. Mitigation: resolve conflicts in code, and let newer facts replace older ones explicitly.
+
+Add a fifth from the security side: **injection**. Retrieved web pages, emails and tool outputs are untrusted input living in your window. The defences are in the [prompt engineering post](/blog/prompt-engineering): least privilege, approvals for irreversible actions and validating outputs.
+
+## A practical context engineering checklist
+
+When an agent misbehaves, I go through this before touching the prompt wording.
+
+1. **Print the window.** Log the exact assembled context for a failing run. Most bugs are visible once you read it.
+2. **Does it contain the answer?** If not, fix retrieval, not the prompt.
+3. **Is anything in it that should not be?** Irrelevant chunks, stale tool output, duplicate content.
+4. **Are the tool descriptions clear, distinct and few?** Rewrite vague ones. Cut unused ones.
+5. **Is the order sensible?** Stable content first, long documents before the question, key items not buried.
+6. **Is the history managed?** Trim tool outputs, summarise old turns, keep exact values in structured state.
+7. **Is memory read and written deliberately?** Know what is stored, when it is loaded and how it is corrected.
+8. **Is the budget measured?** Track tokens per component and latency, especially for voice.
+9. **Are untrusted sources marked as data?** And do they lack the power to cause harm?
+10. **Is it tested?** Run a small evaluation set after each context change, as in the prompt post, and keep failing cases.
+
+## Key takeaways
+
+- Context engineering is deciding what goes into the window, in what form and order, on every call. Prompt wording is one part of it.
+- A bigger window does not remove the problem. Position and noise affect accuracy, as the "Lost in the Middle" research showed.
+- Select first: filter, rerank and keep fewer, better items, or let the model fetch on demand.
+- Compress tool outputs and old turns, and keep exact values in structured state because summaries lose detail.
+- Tool descriptions are prompts. Make them specific, distinct and few. That is the premise behind MCPForge.
+- Use memory deliberately: decide what is written, when it is read and how it is corrected.
+- Isolate noisy work in subagents and return distilled results.
+- For voice, every token costs latency, so keep prompts and state compact.
+- Debug by printing the window. Look for poisoning, distraction, confusion and clash.
+
+## FAQ
+
+### What is context engineering in simple terms?
+
+It is choosing what an AI model sees on each call: the instructions, tool descriptions, retrieved documents, conversation history, memory and state. The aim is to include what the model needs for the current step and leave out everything else.
+
+### Is context engineering replacing prompt engineering?
+
+No. Prompt engineering is still the craft of writing clear instructions and examples. Context engineering is the larger task of managing everything in the window across a multi-step run. In a simple one-shot task the two are nearly the same, while in an agent the context work dominates.
+
+### What is the "lost in the middle" problem?
+
+It is a finding from Liu et al. (2023) that language models often use information at the start and end of a long input better than information in the middle. Results vary by model, and newer models have improved, so test it on your own data before reordering anything.
+
+### How do I stop my agent's context from growing too large?
+
+Trim tool outputs in code before the model sees them, clear results you have finished with, keep the last few turns verbatim, summarise older ones, and store exact values (IDs, numbers, constraints) in structured state so a summary cannot lose them.
