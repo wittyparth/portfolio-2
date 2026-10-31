@@ -1,5 +1,5 @@
 import { isValidElement, type ReactElement, type ReactNode } from "react";
-import { codeToHtml } from "shiki";
+import { codeToHtml, type ShikiTransformer } from "shiki";
 import { CopyCode } from "./copy-code";
 
 const LABELS: Record<string, string> = {
@@ -8,12 +8,24 @@ const LABELS: Record<string, string> = {
   css: "CSS", html: "HTML", md: "Markdown", mdx: "MDX", go: "Go", rust: "Rust", diff: "Diff", text: "Text",
 };
 
+// Diff lines get a class so the gutter marks and hunk headers can use darker shades on the light theme (the stock ones miss AA).
+const diffLines: ShikiTransformer = {
+  line(node) {
+    const first = node.children[0];
+    const text = first && first.type === "element" ? first.children.map((c) => (c.type === "text" ? c.value : "")).join("") : "";
+    if (text.startsWith("@@")) this.addClassToHast(node, "diff-hunk");
+    else if (text.startsWith("+")) this.addClassToHast(node, "diff-add");
+    else if (text.startsWith("-")) this.addClassToHast(node, "diff-del");
+    else if (text.startsWith("~")) this.addClassToHast(node, "diff-mod");
+  },
+};
+
 // Cached: shiki reads the clock while loading grammars, which prerendering won't allow uncached.
 async function highlight(code: string, lang: string) {
   "use cache";
   const themes = { light: "github-light", dark: "github-dark" };
   try {
-    return await codeToHtml(code, { lang, themes, defaultColor: false });
+    return await codeToHtml(code, { lang, themes, defaultColor: false, transformers: [diffLines] });
   } catch {
     return await codeToHtml(code, { lang: "text", themes, defaultColor: false });
   }
@@ -37,7 +49,7 @@ export async function Pre({ children, title }: { children?: ReactNode; title?: s
         <CopyCode code={raw} />
       </figcaption>
       <div
-        className="overflow-x-auto py-4 font-mono text-[13px] leading-6 [&_pre]:w-max [&_pre]:min-w-full [&_pre]:!bg-transparent [&_pre]:px-4"
+        className="overflow-x-auto py-4 font-mono text-[13px] leading-6 [&_pre]:w-max [&_pre]:min-w-full [&_pre]:!bg-transparent [&_pre]:px-4 [&_.diff-add_span]:!text-emerald-700 dark:[&_.diff-add_span]:!text-emerald-400 [&_.diff-del_span]:!text-red-700 dark:[&_.diff-del_span]:!text-red-400 [&_.diff-hunk_span]:!text-sky-700 dark:[&_.diff-hunk_span]:!text-sky-400 [&_.diff-mod_span]:!text-amber-700 dark:[&_.diff-mod_span]:!text-amber-400"
         dangerouslySetInnerHTML={{ __html: html }}
       />
     </figure>

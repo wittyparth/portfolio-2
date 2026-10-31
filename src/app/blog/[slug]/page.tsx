@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { mdxComponents } from "@/mdx-components";
-import { SplittingText } from "@animate-ui/react/primitives/texts/splitting";
 import { ArticleLayout } from "@/components/article-layout";
 import { BackLink } from "@/components/page-header";
 import { PostStatsProvider, Reactions, Share, ViewCount } from "@/components/post-stats";
@@ -61,10 +60,10 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]">) {
         header={
           <header className="pt-16 sm:pt-20">
             <BackLink href="/blog" label="Writing" />
-            <h1 className="mt-6 text-[2rem] leading-[1.15] font-semibold tracking-[-0.03em] text-balance sm:text-[2.25rem]">
-              <SplittingText text={post.title} type="chars" stagger={0.012} />
+            <h1 className="mt-6 text-[2rem] leading-[1.15] font-semibold tracking-[-0.03em] text-balance [overflow-wrap:anywhere] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-700 motion-safe:ease-out sm:text-[2.25rem]">
+              {post.title}
             </h1>
-            <p className="mt-4 text-[17px] leading-relaxed text-pretty text-muted-foreground">{post.summary}</p>
+            <p className="mt-4 text-[17px] leading-relaxed text-pretty text-muted-foreground motion-safe:animate-in motion-safe:fade-in motion-safe:duration-1000 motion-safe:fill-mode-backwards motion-safe:delay-150">{post.summary}</p>
             <div className="mt-6 flex flex-wrap items-center gap-x-2.5 gap-y-2 text-sm text-muted-foreground">
               <time dateTime={post.date}>{longDate(post.date)}</time>
               <span aria-hidden>·</span>
@@ -72,12 +71,12 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]">) {
               <span aria-hidden>·</span>
               <ViewCount />
               {post.tags.length > 0 && (
-                <ul className="flex gap-1.5 sm:ml-auto">
+                <ul className="flex flex-wrap gap-1.5 sm:ml-auto">
                   {post.tags.map((t) => (
                     <li key={t}>
                       <Link
                         href={`/blog?tag=${encodeURIComponent(t)}`}
-                        className="rounded-full border border-border px-2.5 py-0.5 font-mono text-xs transition-colors hover:border-foreground/30 hover:text-foreground"
+                        className="inline-flex min-h-6 items-center rounded-full border border-border px-2.5 text-xs transition-colors hover:border-foreground/30 hover:text-foreground"
                       >
                         {t}
                       </Link>

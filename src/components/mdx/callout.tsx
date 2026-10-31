@@ -5,9 +5,9 @@ import { Info, Lightbulb, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const KINDS = {
-  note: { icon: Info, label: "Note", tone: "text-sky-600 dark:text-sky-400" },
-  tip: { icon: Lightbulb, label: "Tip", tone: "text-emerald-600 dark:text-emerald-400" },
-  warn: { icon: TriangleAlert, label: "Careful", tone: "text-amber-600 dark:text-amber-400" },
+  note: { icon: Info, label: "Note", tone: "text-sky-700 dark:text-sky-400" },
+  tip: { icon: Lightbulb, label: "Tip", tone: "text-emerald-700 dark:text-emerald-400" },
+  warn: { icon: TriangleAlert, label: "Careful", tone: "text-amber-700 dark:text-amber-400" },
 };
 
 export function Callout({ type = "note", children }: { type?: keyof typeof KINDS; children: ReactNode }) {

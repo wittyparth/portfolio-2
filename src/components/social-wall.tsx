@@ -8,7 +8,6 @@ import { Heart } from "@/components/animate-ui/icons/heart";
 import { MessageCircleMore } from "@/components/animate-ui/icons/message-circle-more";
 import { Repeat } from "@/components/animate-ui/icons/repeat";
 import type { SocialPost } from "@content/social";
-import { profile } from "@/lib/content";
 import { compact, longDate, shortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { BrandIcon } from "./brand-icon";
@@ -57,25 +56,11 @@ function PostCard({ post }: { post: SocialPost }) {
 
   return (
     <article className="rounded-xl border border-border bg-card p-4 shadow-[0_1px_2px_rgb(0_0_0/0.04)]">
-      <header className="flex items-center gap-3">
-        <Image
-          src={`https://github.com/${profile.github}.png?size=80`}
-          alt=""
-          width={36}
-          height={36}
-          className="size-9 rounded-full border border-border"
-        />
-        <div className="min-w-0 flex-1 leading-tight">
-          <p className="truncate text-sm font-medium">{profile.name}</p>
-          <p className="text-xs text-muted-foreground">
-            on {PLATFORM[post.platform]} ·{" "}
-            <time dateTime={post.date}>{longDate(post.date)}</time>
-          </p>
-        </div>
-        <BrandIcon
-          name={post.platform}
-          className="size-4 shrink-0 text-muted-foreground"
-        />
+      <header className="flex items-center gap-2 text-xs text-muted-foreground">
+        <BrandIcon name={post.platform} className="size-3.5 shrink-0" />
+        <span className="font-medium text-foreground">{PLATFORM[post.platform]}</span>
+        <span aria-hidden>·</span>
+        <time dateTime={post.date}>{longDate(post.date)}</time>
       </header>
 
       <AutoHeight
@@ -99,7 +84,7 @@ function PostCard({ post }: { post: SocialPost }) {
           aria-expanded={open}
           aria-controls={id}
           onClick={() => setOpen((o) => !o)}
-          className="mt-1.5 text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+          className="mt-1.5 inline-flex min-h-6 items-center text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
         >
           {open ? "Show less" : "Show more"}
         </button>
@@ -117,28 +102,23 @@ function PostCard({ post }: { post: SocialPost }) {
         />
       ))}
 
-      <footer className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
-        <Metric
-          icon={<Heart size={13} />}
-          value={post.metrics?.likes}
-          label="likes"
-        />
-        <Metric
-          icon={<MessageCircleMore size={13} />}
-          value={post.metrics?.comments}
-          label="comments"
-        />
-        <Metric
-          icon={<Repeat size={13} />}
-          value={post.metrics?.reposts}
-          label="reposts"
-        />
+      <footer className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        {post.placeholder ? (
+          // Sample numbers would read as real ones, so placeholders show none.
+          <span>Sample post</span>
+        ) : (
+          <>
+            <Metric icon={<Heart size={13} />} value={post.metrics?.likes} label="likes" />
+            <Metric icon={<MessageCircleMore size={13} />} value={post.metrics?.comments} label="comments" />
+            <Metric icon={<Repeat size={13} />} value={post.metrics?.reposts} label="reposts" />
+          </>
+        )}
         <AnimateIcon animateOnHover asChild>
           <a
             href={post.url}
             target="_blank"
             rel="noreferrer"
-            className="ml-auto inline-flex items-center gap-1 text-sm transition-colors hover:text-foreground"
+            className="ml-auto inline-flex min-h-6 items-center gap-1 text-sm transition-colors hover:text-foreground"
           >
             View on {PLATFORM[post.platform]} <span aria-hidden>↗</span>
           </a>
@@ -150,18 +130,18 @@ function PostCard({ post }: { post: SocialPost }) {
 
 const TABLE_COLS =
   "grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-4 sm:grid-cols-[2rem_minmax(0,1fr)_8rem_4.5rem]";
+const TABLE_COLS_PLAIN = "grid grid-cols-[2rem_minmax(0,1fr)_auto] items-center gap-x-4";
 
 function PostsTable({ posts }: { posts: SocialPost[] }) {
+  const real = posts.some((p) => !p.placeholder && p.metrics);
+  const cols = real ? TABLE_COLS : TABLE_COLS_PLAIN;
   return (
     <div>
       <LedgerHead
-        cols={TABLE_COLS}
-        labels={[
-          "No.",
-          "Post",
-          { label: "Reactions", className: "hidden sm:block" },
-          { label: "Date", className: "text-right" },
-        ]}
+        cols={cols}
+        labels={real
+          ? ["No.", "Post", { label: "Reactions", className: "hidden sm:block" }, { label: "Date", className: "text-right" }]
+          : ["No.", "Post", { label: "Date", className: "text-right" }]}
       />
       <ol className={ledgerList}>
         {posts.map((p, i) => {
@@ -172,7 +152,7 @@ function PostsTable({ posts }: { posts: SocialPost[] }) {
                 href={p.url}
                 target="_blank"
                 rel="noreferrer"
-                className={cn(TABLE_COLS, ledgerRow)}
+                className={cn(cols, ledgerRow)}
               >
                 <RowNumber n={i + 1} arrow="↗" />
                 <span className="min-w-0">
@@ -197,7 +177,7 @@ function PostsTable({ posts }: { posts: SocialPost[] }) {
                     </span>
                   )}
                 </span>
-                <span className="hidden items-center gap-3 text-xs text-muted-foreground sm:flex">
+                {real && <span className="hidden items-center gap-3 text-xs text-muted-foreground sm:flex">
                   <Metric
                     icon={<Heart size={12} />}
                     value={p.metrics?.likes}
@@ -208,7 +188,7 @@ function PostsTable({ posts }: { posts: SocialPost[] }) {
                     value={p.metrics?.comments}
                     label="comments"
                   />
-                </span>
+                </span>}
                 <time
                   dateTime={p.date}
                   className="text-right font-mono text-xs text-muted-foreground tabular-nums"
@@ -246,7 +226,7 @@ function Timeline({ posts }: { posts: SocialPost[] }) {
 
 export function SocialWall({ posts }: { posts: SocialPost[] }) {
   const [filter, setFilter] = React.useState<Filter>("all");
-  const [view, setView] = React.useState<"wall" | "list" | "table">("wall");
+  const [view, setView] = React.useState<"list" | "grid" | "table">("grid");
   const sorted = React.useMemo(
     () => [...posts].sort((a, b) => b.date.localeCompare(a.date)),
     [posts],
@@ -293,13 +273,15 @@ export function SocialWall({ posts }: { posts: SocialPost[] }) {
           value={view}
           onChange={setView}
           views={[
-            { value: "wall", label: "Wall", icon: <LayoutDashboard size={14} /> },
             { value: "list", label: "List", icon: <List size={14} /> },
+            { value: "grid", label: "Grid", icon: <LayoutDashboard size={14} /> },
             { value: "table", label: "Table", icon: <Rows3 className="size-3.5" /> },
           ]}
         />
       </div>
-      {view === "table" ? (
+      {shown.length === 0 ? (
+        <p className="mt-8 text-muted-foreground">Nothing from this platform yet.</p>
+      ) : view === "table" ? (
         <div className="mt-8">
           <PostsTable posts={shown} />
         </div>

@@ -25,7 +25,9 @@ function useActiveHeading(ids: string[]) {
     const els = ids.map((id) => document.getElementById(id)).filter((e): e is HTMLElement => !!e);
     if (!els.length) return;
     // The active section is the last heading that has scrolled past the upper third of the viewport.
+    let frame = 0;
     const update = () => {
+      frame = 0;
       const line = window.innerHeight * 0.3;
       let current: string | null = null;
       for (const el of els) if (el.getBoundingClientRect().top <= line) current = el.id;
@@ -33,11 +35,13 @@ function useActiveHeading(ids: string[]) {
       setActive(atEnd ? els[els.length - 1].id : current);
     };
     update();
-    window.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
+    const schedule = () => { if (!frame) frame = requestAnimationFrame(update); };
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
     return () => {
-      window.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
     };
   }, [ids]);
   return active;
@@ -50,7 +54,7 @@ export function Toc({ headings }: { headings: Heading[] }) {
 
   return (
     <nav aria-label="On this page" className="text-[13px]">
-      <p className="mb-3 font-mono text-[11px] tracking-[0.12em] text-muted-foreground uppercase">On this page</p>
+      <p className="mb-3 text-xs font-medium text-muted-foreground">On this page</p>
       <div className="relative pl-4">
         <span aria-hidden className="absolute inset-y-0 left-0 w-px bg-border" />
         <ScrollProgress mode="scaleY" aria-hidden className="absolute inset-y-0 left-0 w-px origin-top bg-foreground" />
