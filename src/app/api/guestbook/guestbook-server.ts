@@ -1,9 +1,10 @@
 import "server-only";
-import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import {
   RegExpMatcher, TextCensor, asteriskCensorStrategy, englishDataset, englishRecommendedTransformers, keepStartCensorStrategy,
 } from "obscenity";
 import { store } from "@/lib/store";
+import { serverSecret, visitorHash } from "@/lib/visitor";
 import {
   MIN_FILL_MS, PAGE_SIZE, type GuestbookEntry, type GuestbookError,
 } from "@/lib/guestbook";
@@ -14,13 +15,7 @@ const TOKEN_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 type StoredEntry = GuestbookEntry & { ipHash: string };
 
-const g = globalThis as unknown as { __gbSecret?: string };
-const SECRET =
-  process.env.GUESTBOOK_SECRET ??
-  process.env.UPSTASH_REDIS_REST_TOKEN ??
-  (g.__gbSecret ??= randomBytes(32).toString("hex"));
-
-const sign = (value: string) => createHmac("sha256", SECRET).update(value).digest("base64url");
+const sign = (value: string) => createHmac("sha256", serverSecret()).update(value).digest("base64url");
 
 export function issueToken(now = Date.now()) {
   const ts = String(now);
@@ -42,7 +37,7 @@ export function checkToken(token: unknown, now = Date.now()): GuestbookError | n
   return null;
 }
 
-export const hashIp = (ip: string) => createHash("sha256").update(`${SECRET}:${ip}`).digest("hex").slice(0, 32);
+export const hashIp = (ip: string) => visitorHash(ip);
 export const hashText = (text: string) => createHash("sha256").update(text.toLowerCase()).digest("hex").slice(0, 32);
 
 const matcher = new RegExpMatcher({ ...englishDataset.build(), ...englishRecommendedTransformers });
@@ -67,8 +62,7 @@ export function applyContentPolicy(text: string): { ok: true; text: string } | {
 
 const toPublic = ({ id, name, message, createdAt }: StoredEntry): GuestbookEntry => ({ id, name, message, createdAt });
 
-async function readAll(): Promise<{ raw: string; entry: StoredEntry }[]> {
-  const raws = await store.lrange(LIST_KEY, 0, CAP - 1);
+function parseRows(raws: string[]): { raw: string; entry: StoredEntry }[] {
   const out: { raw: string; entry: StoredEntry }[] = [];
   for (const raw of raws) {
     try {
@@ -81,14 +75,27 @@ async function readAll(): Promise<{ raw: string; entry: StoredEntry }[]> {
   return out;
 }
 
-export async function listEntries(cursor?: string | null) {
-  const all = await readAll();
+const readAll = async () => parseRows(await store.lrange(LIST_KEY, 0, CAP - 1));
+
+/** Newest first. Reads only as much of the list as the page needs (plus one row to know if more exist). */
+export async function listEntries(cursor?: string | null, limit = PAGE_SIZE) {
   const parsed = Number(cursor);
   const before = cursor && Number.isFinite(parsed) ? parsed : Infinity;
-  const older = all.filter(({ entry }) => entry.createdAt < before);
-  const page = older.slice(0, PAGE_SIZE).map(({ entry }) => toPublic(entry));
-  const nextCursor = older.length > PAGE_SIZE ? String(page[page.length - 1].createdAt) : null;
-  return { entries: page, nextCursor, total: all.length };
+  const total = await store.llen(LIST_KEY);
+
+  // Entries are stored newest first, so a cursor is just "skip rows at least as new as it".
+  // Fetch in growing windows until we have limit + 1 older rows or run out of list.
+  let window = limit + 1;
+  for (;;) {
+    const rows = parseRows(await store.lrange(LIST_KEY, 0, Math.min(window, CAP) - 1));
+    const older = rows.filter(({ entry }) => entry.createdAt < before);
+    if (older.length > limit || window >= Math.min(total, CAP)) {
+      const page = older.slice(0, limit).map(({ entry }) => toPublic(entry));
+      const nextCursor = older.length > limit ? String(page[page.length - 1].createdAt) : null;
+      return { entries: page, nextCursor, total };
+    }
+    window *= 2;
+  }
 }
 
 export async function addEntry(name: string, message: string, ipHash: string) {

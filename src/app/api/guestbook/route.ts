@@ -1,5 +1,6 @@
+import { PUBLIC_CACHE } from "@/lib/http";
 import { connection } from "next/server";
-import { clientIp, rateLimit, store } from "@/lib/store";
+import { clientIp, rateLimit, store, storeUnavailable } from "@/lib/store";
 import {
   normalizeMessage, normalizeName, validateFields, type GuestbookError,
 } from "@/lib/guestbook";
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
     const page = await listEntries(url.searchParams.get("cursor"));
     return Response.json(
       { ...page, token: url.searchParams.has("token") ? issueToken() : undefined },
-      { headers: { "Cache-Control": "no-store" } },
+      { headers: { "Cache-Control": url.searchParams.has("token") ? "no-store" : PUBLIC_CACHE } },
     );
   } catch {
     return fail(500, { code: "server_error", message: "Couldn't load the guestbook. Try again in a moment." });
@@ -29,6 +30,10 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   await connection();
+
+  const down = storeUnavailable();
+  if (down)
+    return fail(503, { code: "server_error", message: "The guestbook is taking a short break. Please try again later." });
 
   if (!request.headers.get("content-type")?.toLowerCase().includes("application/json"))
     return fail(415, { code: "unsupported_media", message: "Send the note as JSON." });

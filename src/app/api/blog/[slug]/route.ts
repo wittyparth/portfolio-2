@@ -1,14 +1,13 @@
-import { createHash } from "node:crypto";
 import { getPost } from "@/lib/blog";
-import { clientIp, rateLimit, store } from "@/lib/store";
+import { clientIp, rateLimit, store, storeUnavailable } from "@/lib/store";
+import { PUBLIC_CACHE, apiError, readJson, unavailable } from "@/lib/http";
+import { visitorHash } from "@/lib/visitor";
 
 // Per-post views (one per visitor per day) and reactions (up to MAX_REACTIONS per visitor, ever).
 const MAX_REACTIONS = 3;
 const YEAR = 60 * 60 * 24 * 365;
 
-// Visitors are keyed by a salted hash, so no raw IP is stored long-term.
-const visitor = (req: Request) =>
-  createHash("sha256").update(`${process.env.GUESTBOOK_SECRET ?? "portfolio"}:${clientIp(req.headers)}`).digest("hex").slice(0, 24);
+const visitor = (req: Request) => visitorHash(clientIp(req.headers), 24);
 
 async function stats(slug: string, who: string) {
   const [views, reactions, mine] = await Promise.all([
@@ -19,33 +18,54 @@ async function stats(slug: string, who: string) {
   return { views: Number(views ?? 0), reactions: Number(reactions ?? 0), mine: Number(mine ?? 0), max: MAX_REACTIONS };
 }
 
-export async function GET(req: Request, { params }: RouteContext<"/api/blog/[slug]">) {
-  const { slug } = await params;
-  if (!getPost(slug)) return Response.json({ error: "Unknown post" }, { status: 404 });
-  return Response.json(await stats(slug, visitor(req)), { headers: { "Cache-Control": "no-store" } });
+export async function GET(_req: Request, { params }: RouteContext<"/api/blog/[slug]">) {
+  try {
+    const { slug } = await params;
+    if (!getPost(slug)) return apiError(404, "not_found", "Unknown post.");
+    // Per-visitor `mine` is omitted so the response is identical for everyone and safe to share from a CDN.
+    const [views, reactions] = await Promise.all([
+      store.get<number>(`post:views:${slug}`),
+      store.get<number>(`post:reactions:${slug}`),
+    ]);
+    return Response.json(
+      { views: Number(views ?? 0), reactions: Number(reactions ?? 0), max: MAX_REACTIONS },
+      { headers: { "Cache-Control": PUBLIC_CACHE } },
+    );
+  } catch {
+    return unavailable();
+  }
 }
 
 export async function POST(req: Request, { params }: RouteContext<"/api/blog/[slug]">) {
-  const { slug } = await params;
-  if (!getPost(slug)) return Response.json({ error: "Unknown post" }, { status: 404 });
+  const down = storeUnavailable();
+  if (down) return down;
+  try {
+    const { slug } = await params;
+    if (!getPost(slug)) return apiError(404, "not_found", "Unknown post.");
 
-  const body = (await req.json().catch(() => null)) as { action?: unknown } | null;
-  const action = body?.action;
-  if (action !== "view" && action !== "react") return Response.json({ error: "Unknown action" }, { status: 400 });
+    const read = await readJson(req, 512);
+    if (!read.ok) return read.response;
+    const action = read.body.action;
+    if (action !== "view" && action !== "react") return apiError(400, "bad_request", "Unknown action.");
 
-  const who = visitor(req);
-  const limit = await rateLimit(`post:${who}`, 30, 60);
-  if (!limit.ok) return Response.json({ error: "Slow down a little." }, { status: 429 });
+    const who = visitor(req);
+    const limit = await rateLimit(`post:${who}`, 30, 60);
+    if (!limit.ok) return apiError(429, "rate_limited", "Slow down a little.", { "Retry-After": String(limit.retryAfter) });
 
-  if (action === "view") {
-    if (await store.set(`post:seen:${slug}:${who}`, 1, { nx: true, ex: 60 * 60 * 24 })) await store.incr(`post:views:${slug}`);
-  } else {
-    const key = `post:reacted:${slug}:${who}`;
-    const mine = Number((await store.get<number>(key)) ?? 0);
-    if (mine >= MAX_REACTIONS) return Response.json({ ...(await stats(slug, who)), capped: true });
-    await store.incr(key);
-    await store.expire(key, YEAR);
-    await store.incr(`post:reactions:${slug}`);
+    if (action === "view") {
+      if (await store.set(`post:seen:${slug}:${who}`, 1, { nx: true, ex: 60 * 60 * 24 })) await store.incr(`post:views:${slug}`);
+    } else {
+      // Increment first, then undo if that went over the cap: two racing requests can't both slip past a read-then-write check.
+      const key = `post:reacted:${slug}:${who}`;
+      const mine = await store.incrExpire(key, YEAR);
+      if (mine > MAX_REACTIONS) {
+        await store.decr(key);
+        return Response.json({ ...(await stats(slug, who)), capped: true }, { headers: { "Cache-Control": "no-store" } });
+      }
+      await store.incr(`post:reactions:${slug}`);
+    }
+    return Response.json(await stats(slug, who), { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return unavailable();
   }
-  return Response.json(await stats(slug, who));
 }
