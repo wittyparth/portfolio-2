@@ -4,7 +4,7 @@ import { profile } from "@/lib/content";
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 export function GET() {
-  const posts = getPosts().filter((p) => !p.draft);
+  const posts = getPosts().filter((p) => !p.draft && !p.placeholder);
   const items = posts
     .map((p) => {
       const url = `${profile.site}/blog/${p.slug}`;
