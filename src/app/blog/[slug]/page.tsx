@@ -8,6 +8,8 @@ import { PostStatsProvider, Reactions, Share, ViewCount } from "@/components/pos
 import { getPost, getPosts, neighbours, type Post } from "@/lib/blog";
 import { profile } from "@/lib/content";
 import { longDate } from "@/lib/format";
+import { JsonLd } from "@/components/json-ld";
+import { authorLd, breadcrumbLd, pageMetadata, siteUrl, websiteId } from "@/lib/seo";
 
 export function generateStaticParams() {
   return getPosts().map((p) => ({ slug: p.slug }));
@@ -17,13 +19,17 @@ export async function generateMetadata({ params }: PageProps<"/blog/[slug]">): P
   "use cache";
   const post = getPost((await params).slug);
   if (!post) return {};
-  return {
+  return pageMetadata({
     title: `${post.title} · ${profile.name}`,
     description: post.summary,
-    alternates: { canonical: `/blog/${post.slug}` },
-    openGraph: { type: "article", title: post.title, description: post.summary, publishedTime: post.date, url: `/blog/${post.slug}`, images: [{ url: `/og/blog/${post.slug}`, width: 1200, height: 630 }] },
-    twitter: { card: "summary_large_image", title: post.title, description: post.summary, images: [`/og/blog/${post.slug}`] },
-  };
+    path: `/blog/${post.slug}`,
+    image: `/og/blog/${post.slug}`,
+    type: "article",
+    publishedTime: post.date,
+    modifiedTime: post.updated ?? post.date,
+    tags: post.tags,
+    noindex: post.placeholder,
+  });
 }
 
 function Neighbour({ post, direction }: { post?: Post; direction: "newer" | "older" }) {
@@ -53,12 +59,31 @@ export default async function PostPage({ params }: PageProps<"/blog/[slug]">) {
   const { newer, older } = neighbours(slug);
   const url = `${profile.site}/blog/${slug}`;
 
+  const article = {
+    "@type": "BlogPosting",
+    "@id": `${url}#post`,
+    mainEntityOfPage: url,
+    headline: post.title,
+    description: post.summary,
+    url,
+    image: siteUrl(`/og/blog/${slug}`),
+    datePublished: post.date,
+    dateModified: post.updated ?? post.date,
+    inLanguage: "en",
+    keywords: post.tags.join(", "),
+    author: authorLd,
+    publisher: authorLd,
+    isPartOf: { "@id": websiteId },
+  };
+  const crumbs = breadcrumbLd([{ name: "Home", path: "/" }, { name: "Writing", path: "/blog" }, { name: post.title, path: `/blog/${slug}` }]);
+
   return (
     <PostStatsProvider slug={slug}>
       <ArticleLayout
         headings={post.headings}
         header={
           <header className="pt-16 sm:pt-20">
+            <JsonLd data={post.placeholder ? [crumbs] : [article, crumbs]} />
             <BackLink href="/blog" label="Writing" />
             <h1 className="mt-6 text-[2rem] leading-[1.15] font-semibold tracking-[-0.03em] text-balance [overflow-wrap:anywhere] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-700 motion-safe:ease-out sm:text-[2.25rem]">
               {post.title}

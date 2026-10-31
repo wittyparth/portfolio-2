@@ -12,6 +12,8 @@ import { TechIcon } from "@/components/tech-icons";
 import { getProject, getProjects, type Project } from "@/lib/projects";
 import { parseArchitecture } from "@/lib/architecture";
 import { profile } from "@/lib/content";
+import { JsonLd } from "@/components/json-ld";
+import { authorLd, breadcrumbLd, pageMetadata, siteUrl } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 
 const STATUS = {
@@ -28,13 +30,13 @@ export async function generateMetadata({ params }: PageProps<"/projects/[slug]">
   "use cache";
   const p = getProject((await params).slug);
   if (!p) return {};
-  return {
+  return pageMetadata({
     title: `${p.name} · ${profile.name}`,
     description: p.tagline,
-    alternates: { canonical: `/projects/${p.slug}` },
-    openGraph: { title: p.name, description: p.tagline, url: `/projects/${p.slug}`, images: [{ url: `/og/projects/${p.slug}`, width: 1200, height: 630 }] },
-    twitter: { card: "summary_large_image", title: p.name, description: p.tagline, images: [`/og/projects/${p.slug}`] },
-  };
+    path: `/projects/${p.slug}`,
+    image: `/og/projects/${p.slug}`,
+    noindex: p.placeholder,
+  });
 }
 
 const pill =
@@ -97,11 +99,28 @@ export default async function ProjectPage({ params }: PageProps<"/projects/[slug
     project.duration && { label: "Timeline", value: project.duration },
   ].filter(Boolean) as { label: string; value: React.ReactNode }[];
 
+  const url = siteUrl(`/projects/${slug}`);
+  const work = {
+    "@type": project.repo ? "SoftwareSourceCode" : "CreativeWork",
+    "@id": `${url}#project`,
+    name: project.name,
+    description: project.tagline,
+    url,
+    image: siteUrl(`/og/projects/${slug}`),
+    inLanguage: "en",
+    dateCreated: project.started ?? project.year,
+    keywords: project.stack.join(", "),
+    author: authorLd,
+    ...(project.repo ? { codeRepository: project.repo } : {}),
+  };
+  const crumbs = breadcrumbLd([{ name: "Home", path: "/" }, { name: "Projects", path: "/projects" }, { name: project.name, path: `/projects/${slug}` }]);
+
   return (
     <ArticleLayout
       headings={project.headings}
       header={
         <header className="pt-16 sm:pt-20">
+          <JsonLd data={project.placeholder ? [crumbs] : [work, crumbs]} />
           <BackLink href="/projects" label="Projects" />
           <h1 className="mt-6 animate-in fade-in slide-in-from-bottom-2 text-[2.25rem] leading-[1.1] font-semibold tracking-[-0.03em] text-balance duration-500 fill-mode-both motion-reduce:animate-none sm:text-[2.75rem]">
             {project.name}

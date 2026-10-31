@@ -4,6 +4,8 @@ import { featuredProjects, getProjects } from "@/lib/projects";
 import { techKey } from "@/lib/tech";
 import { getPosts } from "@/lib/blog";
 import { getContributions, getWeather } from "@/lib/live";
+import { JsonLd } from "@/components/json-ld";
+import { personLd, websiteLd } from "@/lib/seo";
 import { Hero } from "@/components/hero";
 import { Heatmap } from "@/components/heatmap";
 import { HomeProjects } from "@/components/home-projects";
@@ -49,6 +51,7 @@ export default async function Home() {
 
   return (
     <>
+      <JsonLd data={[personLd, websiteLd]} />
       <Hero weather={weather} streak={contributions && contributions.total > 0 ? contributions.streak : null} shipped={getProjects().length} />
 
       <main className="mx-auto w-full max-w-[44rem] px-6 pb-28 sm:pb-16">
