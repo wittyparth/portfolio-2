@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePref } from "@/hooks/use-pref";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { flushSync } from "react-dom";
@@ -212,7 +213,7 @@ function Grid({ projects }: { projects: Project[] }) {
 export function ProjectsIndex({ projects }: { projects: Project[] }) {
   const [status, setStatus] = React.useState<Status>("all");
   const [stack, setStack] = React.useState<string | null>(null);
-  const [view, setView] = React.useState<View>("list");
+  const [view, setView] = usePref<View>("projects-view", "list", ["list", "grid", "table"]);
   const stackOptions = useStackOptions(projects);
   const reduce = useReducedMotion();
 

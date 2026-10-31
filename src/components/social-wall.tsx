@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePref } from "@/hooks/use-pref";
 import Image from "next/image";
 import { AutoHeight } from "@animate-ui/react/primitives/effects/auto-height";
 import { AnimateIcon } from "@animate-ui/react/icons";
@@ -226,7 +227,7 @@ function Timeline({ posts }: { posts: SocialPost[] }) {
 
 export function SocialWall({ posts }: { posts: SocialPost[] }) {
   const [filter, setFilter] = React.useState<Filter>("all");
-  const [view, setView] = React.useState<"list" | "grid" | "table">("grid");
+  const [view, setView] = usePref<"list" | "grid" | "table">("posts-view", "grid", ["list", "grid", "table"]);
   const sorted = React.useMemo(
     () => [...posts].sort((a, b) => b.date.localeCompare(a.date)),
     [posts],

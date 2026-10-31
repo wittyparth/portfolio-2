@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePref } from "@/hooks/use-pref";
 import * as ReactDOM from "react-dom";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -172,7 +173,7 @@ function BlogTable({ posts }: { posts: Item[] }) {
 function Index({ posts, initialType, initialTag }: { posts: Item[]; initialType: PostType | "all"; initialTag: string | null }) {
   const [type, setType] = React.useState<PostType | "all">(initialType);
   const [tag, setTag] = React.useState<string | null>(initialTag);
-  const [view, setView] = React.useState<View>("list");
+  const [view, setView] = usePref<View>("blog-view", "list", ["list", "grid", "table"]);
   
   // List, Grid and Table share post titles by name, so the browser slides each title to its new place.
   const changeView = (next: View) => {

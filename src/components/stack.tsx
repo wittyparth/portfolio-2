@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePref } from "@/hooks/use-pref";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { AnimateIcon } from "@animate-ui/react/icons";
@@ -238,7 +239,7 @@ export function Stack({ usedIn }: { usedIn: Record<string, { slug: string; name:
   const cols = mobile ? 2 : 3;
   const { stars, lines, W, H, rowH } = React.useMemo(() => chart(cols), [cols]);
   const [expanded, setExpanded] = React.useState(false);
-  const [view, setView] = React.useState<"sky" | "shelf">("sky");
+  const [view, setView] = usePref<"sky" | "shelf">("stack-view", "sky", ["sky", "shelf"]);
   const [hover, setHover] = React.useState<Star | null>(null);
   const [selected, setSelected] = React.useState<Star | null>(null);
   const lit = hover?.cluster ?? selected?.cluster ?? null;
