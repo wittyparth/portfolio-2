@@ -69,8 +69,8 @@ function DiffText({ text }: { text: string }) {
 }
 
 const DIFF_STYLE = {
-  "+": "bg-emerald-500/[0.07] text-foreground/85 [&>i]:text-emerald-600 dark:[&>i]:text-emerald-400",
-  "-": "bg-rose-500/[0.07] text-foreground/85 [&>i]:text-rose-600 dark:[&>i]:text-rose-400",
+  "+": "bg-emerald-500/[0.07] text-foreground/85 [&>i]:text-emerald-700 dark:[&>i]:text-emerald-400",
+  "-": "bg-rose-500/[0.07] text-foreground/85 [&>i]:text-rose-700 dark:[&>i]:text-rose-400",
   "~": "text-muted-foreground [&>i]:text-muted-foreground/60",
 };
 
@@ -82,7 +82,7 @@ function Diff({ commit, prev }: { commit: Commit; prev?: Commit }) {
         <span className="truncate">a/{prev ? slug(prev.role) : "dev-null"}</span>
         <span className="truncate">b/{slug(commit.role)}</span>
       </div>
-      <p className="px-3 pt-2 text-[11px] text-sky-600 dark:text-sky-400">
+      <p className="px-3 pt-2 text-[11px] text-sky-700 dark:text-sky-400">
         @@ {month(commit.start)} → {commit.end ? month(commit.end) : "now"} · {commit.location} @@
       </p>
       <ul className="py-1.5">
@@ -153,7 +153,6 @@ export function CareerLog() {
             const x = LANES[lane];
             const head = i === 0 && !c.end;
             const edu = c.tag === "graduated";
-            const firstOfBranch = i === 0 || career[i - 1].branch !== c.branch;
             return (
               <li key={id}>
                 {i > 0 && <Connector from={lanes[i - 1]} to={lane} />}
@@ -195,26 +194,21 @@ export function CareerLog() {
                         >
                           <span className="min-w-0">
                             <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                              <span className="font-mono text-xs text-amber-600 dark:text-amber-400/90">{id}</span>
+                              <span className="font-mono text-xs text-amber-700 dark:text-amber-400/90">{id}</span>
                               <span className="font-medium tracking-tight">{c.role}</span>
                               <span className={edu ? "font-medium text-amber-700 dark:text-amber-300" : "text-muted-foreground"}>· {c.company}</span>
                               {head && (
-                                <span className="rounded-full border border-emerald-500/40 px-1.5 font-mono text-[10.5px] leading-[18px] text-emerald-700 dark:text-emerald-400">
+                                <span className="rounded-full border border-emerald-500/40 px-1.5 font-mono text-[11px] leading-[18px] text-emerald-700 dark:text-emerald-400">
                                   HEAD → {c.branch}
                                 </span>
                               )}
-                              {!head && firstOfBranch && (
-                                <span className="rounded-full border border-border px-1.5 font-mono text-[10.5px] leading-[18px] text-muted-foreground">
-                                  {c.branch}
-                                </span>
-                              )}
                               {edu && (
-                                <span className="rounded-full bg-amber-500/15 px-1.5 font-mono text-[10.5px] leading-[18px] text-amber-800 dark:text-amber-200">
+                                <span className="rounded-full bg-amber-500/15 px-1.5 font-mono text-[11px] leading-[18px] text-amber-800 dark:text-amber-200">
                                   IIT · alma mater
                                 </span>
                               )}
-                              {c.tag && (
-                                <span className="rounded-full border border-amber-500/40 px-1.5 font-mono text-[10.5px] leading-[18px] text-amber-700 dark:text-amber-400">
+                              {c.tag && !edu && (
+                                <span className="rounded-full border border-amber-500/40 px-1.5 font-mono text-[11px] leading-[18px] text-amber-700 dark:text-amber-400">
                                   tag: {c.tag}
                                 </span>
                               )}
@@ -260,7 +254,7 @@ export function CareerLog() {
               <span aria-hidden className="absolute top-0 h-[14px] w-[1.5px] bg-border" style={{ left: LANES[0] - 0.75 }} />
               <span aria-hidden className="absolute top-[10px] size-2 -translate-x-1/2 rotate-45 border border-foreground/40 bg-background" style={{ left: LANES[0] }} />
               <p className="col-start-2 px-2 py-1.5 font-mono text-xs text-muted-foreground">
-                <span className="text-amber-600/80 dark:text-amber-400/70">{hash(careerRoot.message)}</span>{" "}
+                <span className="text-amber-700 dark:text-amber-400/70">{hash(careerRoot.message)}</span>{" "}
                 {careerRoot.message} <span className="opacity-60">· {careerRoot.year}</span>
               </p>
             </div>

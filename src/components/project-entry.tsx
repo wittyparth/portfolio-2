@@ -32,7 +32,7 @@ export function ProjectEntry({ project }: { project: Project }) {
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <h3 className="flex items-center gap-2.5 font-medium tracking-tight">
-              <Link href={`/projects/${project.slug}`} className="underline-offset-4 hover:underline">
+              <Link href={`/projects/${project.slug}`} style={{ viewTransitionName: `project-title-${project.slug}` }} className="underline-offset-4 hover:underline">
                 {project.name}
               </Link>
               <span className="inline-flex items-center gap-1.5 text-xs font-normal text-muted-foreground">

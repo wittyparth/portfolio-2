@@ -14,15 +14,12 @@ import { Contact, VisitorCount } from "@/components/contact";
 import { AroundHere } from "@/components/around-here";
 import { SectionHead } from "@/components/section-head";
 
-// Home sections in order; the numbers in each header come from here.
-const ORDER = ["work", "stack", "projects", "writing", "around", "contact", "activity"] as const;
-
 function Section({
   id, title, action, children,
-}: { id: (typeof ORDER)[number]; title: string; action?: React.ReactNode; children: React.ReactNode }) {
+}: { id: string; title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section id={id} className="scroll-mt-24 pt-16">
-      <SectionHead n={ORDER.indexOf(id) + 1} total={ORDER.length} title={title} action={action} />
+      <SectionHead title={title} action={action} />
       {children}
     </section>
   );
@@ -49,9 +46,9 @@ export default async function Home() {
 
   return (
     <>
-      <Hero weather={weather} streak={contributions?.streak ?? null} shipped={getProjects().length} />
+      <Hero weather={weather} streak={contributions && contributions.total > 0 ? contributions.streak : null} shipped={getProjects().length} />
 
-      <main className="mx-auto w-full max-w-[44rem] px-6 pb-28">
+      <main className="mx-auto w-full max-w-[44rem] px-6 pb-28 sm:pb-16">
         <Section id="work" title="Work and education">
           <CareerLog />
         </Section>
@@ -79,13 +76,13 @@ export default async function Home() {
           <Contact />
         </Section>
 
-        {contributions && (
+        {contributions && contributions.total > 0 && contributions.days.length > 0 && (
           <Section id="activity" title="Activity">
             <Heatmap data={contributions} />
           </Section>
         )}
 
-        <footer className="mt-24 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-6 text-sm text-muted-foreground">
+        <footer className="mt-20 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-6 text-sm text-muted-foreground">
           <span>© {profile.fullName}</span>
           <span className="flex items-center gap-4">
             <VisitorCount />
