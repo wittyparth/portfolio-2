@@ -6,19 +6,19 @@ import { X_URL, siteUrl } from "@/lib/seo";
 // /llms.txt: a plain-Markdown map of the site for AI assistants. Generated from content, so it never drifts.
 // Placeholder projects and posts are left out until they are real.
 export function GET() {
-  const projects = getProjects().filter((p) => !p.placeholder);
+  const projects = getProjects(); // `placeholder` on a project only marks stand-in screenshots
   const posts = getPosts().filter((p) => !p.draft && !p.placeholder);
   const edu = career.find((c) => c.company.startsWith("IIT"));
 
   const lines = [
     `# ${profile.fullName}`,
     "",
-    `> ${profile.fullName} is an ${profile.role} at ${profile.company.name} in ${profile.city}, India. He builds AI agents and the backends that make them dependable: voice agents, tool calling, retrieval and evals, mostly in Python and TypeScript.`,
+    `> ${profile.fullName} is an ${profile.role} at ${profile.company.name} in ${profile.city}, India. Partha builds AI agents and the backends that make them dependable: voice agents, tool calling, retrieval and evals, mostly in Python and TypeScript.`,
     "",
-    ...(edu ? [`He graduated with a B.Tech in Electrical Engineering from ${edu.company} in 2025.`, ""] : []),
+    ...(edu ? [`Partha graduated with a B.Tech in Electrical Engineering from ${edu.company} in 2025.`, ""] : []),
     "## About",
-    `- [Home](${siteUrl("/")}): who he is, work history, tools, projects and contact`,
-    `- [Uses](${siteUrl("/uses")}): hardware and software he works with`,
+    `- [Home](${siteUrl("/")}): about Partha, work history, tools, projects and contact`,
+    `- [Uses](${siteUrl("/uses")}): hardware and software Partha works with`,
     `- [Posts](${siteUrl("/posts")}): shorter thoughts from X and LinkedIn`,
     "",
     "## Projects",

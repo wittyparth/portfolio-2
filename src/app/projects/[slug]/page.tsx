@@ -35,7 +35,6 @@ export async function generateMetadata({ params }: PageProps<"/projects/[slug]">
     description: p.tagline,
     path: `/projects/${p.slug}`,
     image: `/og/projects/${p.slug}`,
-    noindex: p.placeholder,
   });
 }
 
@@ -120,7 +119,7 @@ export default async function ProjectPage({ params }: PageProps<"/projects/[slug
       headings={project.headings}
       header={
         <header className="pt-16 sm:pt-20">
-          <JsonLd data={project.placeholder ? [crumbs] : [work, crumbs]} />
+          <JsonLd data={[work, crumbs]} />
           <BackLink href="/projects" label="Projects" />
           <h1 className="mt-6 animate-in fade-in slide-in-from-bottom-2 text-[2.25rem] leading-[1.1] font-semibold tracking-[-0.03em] text-balance duration-500 fill-mode-both motion-reduce:animate-none sm:text-[2.75rem]">
             {project.name}

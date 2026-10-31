@@ -7,7 +7,8 @@ import { siteUrl } from "@/lib/seo";
 // lastModified comes from content dates; pages with no honest date omit it rather than claim "now".
 export default function sitemap(): MetadataRoute.Sitemap {
   const posts = getPosts().filter((p) => !p.draft && !p.placeholder);
-  const projects = getProjects().filter((p) => !p.placeholder);
+  // Projects are real work; `placeholder` on a project only means its screenshots are stand-ins.
+  const projects = getProjects();
   const latestPost = posts.map((p) => p.updated ?? p.date).sort().at(-1);
 
   const pages: MetadataRoute.Sitemap = [
