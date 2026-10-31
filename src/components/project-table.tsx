@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
+import { Cover } from "./project-media";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { CursorContainer, CursorFollow, CursorProvider } from "@animate-ui/react/primitives/cursor";
@@ -64,10 +64,7 @@ export function ProjectTable({ projects, header = true }: { projects: Project[];
 
                 <span className="min-w-0">
                   <span className="flex items-center gap-2">
-                    <span className={ledgerTitle}>{p.name}</span>
-                    {p.featured && (
-                      <span className="rounded-full border border-border px-1.5 font-mono text-[10px] leading-4 text-muted-foreground">featured</span>
-                    )}
+                    <span className={ledgerTitle}><span style={{ viewTransitionName: `pt-${p.slug}` }}>{p.name}</span></span>
                     <span className={cn("size-1.5 shrink-0 rounded-full sm:hidden", STATUS[p.status].dot)} aria-label={STATUS[p.status].label} />
                   </span>
                   <span className="mt-0.5 block truncate text-sm text-muted-foreground">{p.tagline}</span>
@@ -100,7 +97,7 @@ export function ProjectTable({ projects, header = true }: { projects: Project[];
                   transition={{ type: "spring", stiffness: 320, damping: 28 }}
                   className="w-56 overflow-hidden rounded-lg border border-border bg-card shadow-[0_24px_48px_-16px_rgb(0_0_0/0.35)]"
                 >
-                  <Image src={hovered.cover} alt="" width={448} height={280} className="aspect-[16/10] w-full object-cover" />
+                  <Cover src={hovered.cover} placeholder={hovered.placeholder} width={448} height={280} sizes="224px" />
                 </motion.div>
               )}
             </AnimatePresence>

@@ -28,6 +28,7 @@ function Gallery({
   large?: boolean;
 }) {
   const [api, setApi] = React.useState<CarouselApi>();
+  const many = project.gallery.length > 1;
 
   React.useEffect(() => {
     if (!api || !onIndex) return;
@@ -37,7 +38,7 @@ function Gallery({
   }, [api, onIndex]);
 
   return (
-    <Carousel opts={{ loop: true, align: "center", startIndex }} setApi={setApi} className="group/gallery">
+    <Carousel opts={{ loop: many, watchDrag: many, align: "center", startIndex }} setApi={setApi} className="group/gallery">
       <CarouselContent className="ml-0">
         {project.gallery.map((img, i) => (
           <CarouselItem key={img.src} className="pl-0">
@@ -48,41 +49,59 @@ function Gallery({
               aria-label={onOpen ? `Open ${img.alt} full screen` : img.alt}
               className={cn("relative block aspect-[16/10] w-full", onOpen ? "cursor-zoom-in" : "cursor-default")}
             >
-              <Image
-                src={img.src}
-                alt={img.alt}
-                fill
-                sizes={sizes}
-                className={cn("object-cover", large && "object-contain")}
-                priority={large}
-              />
+              {project.placeholder && !large ? (
+                // The stand-in art carries its own "replace me" line along the bottom edge; crop it and say so calmly instead.
+                <span className="absolute inset-x-0 top-0 block h-[112%]">
+                  <Image src={img.src} alt={img.alt} fill sizes={sizes} className="object-cover" />
+                </span>
+              ) : (
+                <Image
+                  src={img.src}
+                  alt={img.alt}
+                  fill
+                  sizes={sizes}
+                  className={cn("object-cover", large && "object-contain")}
+                  priority={large}
+                />
+              )}
             </button>
-            {large && <p className="px-6 pt-3 pb-10 text-center text-sm text-white/70">{img.alt}</p>}
+            {large && <p className="px-6 pt-3 pb-10 text-center text-sm text-white/80">{img.alt}</p>}
           </CarouselItem>
         ))}
       </CarouselContent>
 
-      <CarouselPrevious
-        variant="secondary"
-        className="left-3 opacity-0 shadow-sm transition-opacity group-hover/gallery:opacity-100 focus-visible:opacity-100 max-sm:hidden"
-      />
-      <CarouselNext
-        variant="secondary"
-        className="right-3 opacity-0 shadow-sm transition-opacity group-hover/gallery:opacity-100 focus-visible:opacity-100 max-sm:hidden"
-      />
+      {project.placeholder && !large && (
+        <span className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-black/55 px-2.5 py-0.5 text-xs text-white/90 backdrop-blur">
+          Placeholder screen
+        </span>
+      )}
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-3 flex items-center justify-between px-3">
-        <CarouselCounter
-          format={(current, count) => (
-            <>
-              {current}
-              <span className="text-white/60">/ {count}</span>
-            </>
-          )}
-          className="flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 font-mono text-[11px] text-white tabular-nums backdrop-blur"
-        />
-        <CarouselDots className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-black/55 px-2 py-1.5 text-white backdrop-blur [&_button]:size-1.5" />
-      </div>
+      {many && (
+        <>
+          <CarouselPrevious
+            variant="secondary"
+            className="left-3 opacity-0 shadow-sm transition-opacity group-hover/gallery:opacity-100 focus-visible:opacity-100 max-sm:hidden"
+          />
+          <CarouselNext
+            variant="secondary"
+            className="right-3 opacity-0 shadow-sm transition-opacity group-hover/gallery:opacity-100 focus-visible:opacity-100 max-sm:hidden"
+          />
+
+          <div className="pointer-events-none absolute inset-x-0 bottom-3 flex items-center justify-end gap-2 px-3">
+            <CarouselCounter
+              format={(current, count) => (
+                <>
+                  {current}
+                  <span className="text-white/80">/ {count}</span>
+                </>
+              )}
+              className="flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 font-mono text-[11px] text-white tabular-nums backdrop-blur"
+            />
+            {/* Dots stay 6px to look; each button reaches 24px through ::after so it is easy to hit. */}
+            <CarouselDots className="pointer-events-auto flex items-center !gap-2 rounded-full bg-black/55 px-3 py-2 text-white backdrop-blur [&_button]:relative [&_button]:!size-1.5 [&_button]:after:absolute [&_button]:after:-inset-[9px] [&_button]:after:content-['']" />
+          </div>
+        </>
+      )}
     </Carousel>
   );
 }
@@ -162,24 +181,28 @@ function DemoVideo({ src, poster, active, title }: { src: string; poster: string
 }
 
 export function ProjectMedia({ project }: { project: Project }) {
-  const [mode, setMode] = React.useState<Mode>("images");
-  const [lightbox, setLightbox] = React.useState<number | null>(null);
-  const modes: Mode[] = ["images"];
+  const modes: Mode[] = [];
+  if (project.gallery.length > 0) modes.push("images");
   if (project.video) modes.push("video");
   if (project.architecture) modes.push("architecture");
+  const [mode, setMode] = React.useState<Mode>(modes[0] ?? "images");
+  const [lightbox, setLightbox] = React.useState<number | null>(null);
+  if (modes.length === 0) return null;
 
   return (
     <>
       <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
         <div className="relative">
           <TabsContents>
-            <TabsContent value="images">
-              <Gallery
-                project={project}
-                sizes="(max-width: 768px) 100vw, 704px"
-                onOpen={(i) => setLightbox(i)}
-              />
-            </TabsContent>
+            {modes.includes("images") && (
+              <TabsContent value="images">
+                <Gallery
+                  project={project}
+                  sizes="(max-width: 768px) 100vw, 704px"
+                  onOpen={(i) => setLightbox(i)}
+                />
+              </TabsContent>
+            )}
             {project.video && (
               <TabsContent value="video" className="aspect-[16/10]">
                 <DemoVideo src={project.video.src} poster={project.video.poster} active={mode === "video"} title={project.name} />
@@ -197,7 +220,7 @@ export function ProjectMedia({ project }: { project: Project }) {
               <TabsHighlight className="rounded-full bg-white/20">
                 {modes.map((m) => (
                   <TabsHighlightItem key={m} value={m}>
-                    <TabsTrigger value={m} className="px-2.5 py-1 capitalize text-white/70 transition-colors data-[state=active]:text-white">
+                    <TabsTrigger value={m} className="px-3 py-1 capitalize text-white/80 transition-colors data-[state=active]:text-white">
                       {m}
                     </TabsTrigger>
                   </TabsHighlightItem>
@@ -229,5 +252,29 @@ export function ProjectMedia({ project }: { project: Project }) {
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+/**
+ * A project's cover. Stand-in art carries its own "replace me" line along the bottom edge,
+ * so placeholder covers are cropped just above it; real covers render untouched.
+ */
+export function Cover({
+  src, placeholder, width, height, sizes, imgClassName,
+}: {
+  src: string;
+  placeholder?: boolean;
+  width: number;
+  height: number;
+  sizes: string;
+  imgClassName?: string;
+}) {
+  if (!placeholder) {
+    return <Image src={src} alt="" width={width} height={height} sizes={sizes} className={cn("aspect-[16/10] w-full object-cover", imgClassName)} />;
+  }
+  return (
+    <span className="relative block aspect-[16/10] w-full overflow-hidden">
+      <Image src={src} alt="" width={width} height={height} sizes={sizes} className={cn("absolute inset-x-0 top-0 h-[112%] w-full object-cover", imgClassName)} />
+    </span>
   );
 }

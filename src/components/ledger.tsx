@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
  */
 export function LedgerHead({ cols, labels }: { cols: string; labels: (string | { label: string; className?: string })[] }) {
   return (
-    <div aria-hidden className={cn(cols, "border-b border-border pb-2 font-mono text-[10.5px] tracking-[0.14em] text-muted-foreground/80 uppercase")}>
+    <div aria-hidden className={cn(cols, "border-b border-border pb-2 text-xs text-muted-foreground")}>
       {labels.map((l) =>
         typeof l === "string" ? <span key={l}>{l}</span> : <span key={l.label} className={l.className}>{l.label}</span>,
       )}
