@@ -96,10 +96,10 @@ function PostCard({ post }: { post: SocialPost }) {
           key={img.src}
           src={img.src}
           alt={img.alt}
-          width={1200}
-          height={750}
+          width={img.width ?? 1200}
+          height={img.height ?? 750}
           sizes="(min-width: 640px) 21rem, 100vw"
-          className="mt-3 h-auto w-full rounded-lg border border-border"
+          className="mt-3 h-auto max-h-[26rem] w-full rounded-lg border border-border object-cover object-top"
         />
       ))}
 

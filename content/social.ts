@@ -1,13 +1,12 @@
 // Curated posts from X and LinkedIn, shown on /posts. Newest first is handled for you.
 // To add one: copy an entry, paste the post's text and URL, and (optionally) drop images in public/posts/.
-// TODO: every entry below is a placeholder. Replace with real posts and real URLs.
 
 export type SocialPost = {
   platform: "x" | "linkedin";
   date: string; // YYYY-MM-DD
   text: string; // Blank lines become paragraphs.
   url: string;
-  images?: { src: string; alt: string }[];
+  images?: { src: string; alt: string; width?: number; height?: number }[];
   metrics?: { likes?: number; reposts?: number; comments?: number };
   placeholder?: boolean;
 };
@@ -15,52 +14,37 @@ export type SocialPost = {
 export const socialPosts: SocialPost[] = [
   {
     platform: "x",
-    date: "2026-10-24",
-    text: "Hot take: most agent failures aren't model failures. They're API failures the model was never told about.\n\nA 400 with \"Something went wrong\" is a dead end for a person. For an agent it's an infinite retry loop.",
-    url: "https://x.com/",
-    metrics: { likes: 48, reposts: 6, comments: 9 },
-    placeholder: true,
+    date: "2026-10-19",
+    text: "Initially I was primarily learning how to integrate LLMs into software like RAG, AI Agents, Evals, etc.\n\nNow realized you can do so much better if you have the knowledge of ML, both theoretical and applied.\n\nStarting this course and will share updates here: aiengineeringfromscratch.com",
+    url: "https://x.com/itspartha_/status/2112182220140286197",
+    images: [{ src: "/posts/x-ml-course.jpg", alt: "The AI Engineering from Scratch course page", width: 1199, height: 679 }],
   },
   {
     platform: "linkedin",
-    date: "2026-10-15",
-    text: "I've been building MCPForge for a few months now: upload an OpenAPI spec, get an MCP server your agents can use.\n\nThe surprising part? Generating the server took a weekend. Deciding which of 300 endpoints an agent should actually see took the rest of the time.\n\nCurating tools is the real product. A few things I learned along the way:\n\n→ Fewer tools beat more tools, every time.\n→ Descriptions should say when to use a tool, not just what it does.\n→ Show people exactly what the agent will get before you deploy anything.\n\nIf you're wiring agents to internal APIs, I'd love to hear what's breaking for you.",
-    url: "https://www.linkedin.com/",
-    images: [{ src: "/projects/mcpforge/2-reviewing-generated-mcp-tools.png", alt: "MCPForge's tool review screen" }],
-    metrics: { likes: 212, comments: 31, reposts: 14 },
-    placeholder: true,
+    date: "2026-08-29",
+    text: "Most AI tutorials end when the demo works.\nReal AI engineering starts after that.\n\nWhat happens when retrieval fails?\nHow do you evaluate an agent?\nWhat breaks at scale?\nHow do you design systems instead of chaining APIs?\n\nI've been collecting books that help build the mental models for those questions.\n\nHere are 9 worth knowing about.\n\nWhich book would you add?",
+    url: "https://www.linkedin.com/feed/update/urn:li:activity:7499315366033063936/",
+    images: [{ src: "/posts/li-ai-engineering-books.jpg", alt: "Nine books on AI engineering, evaluation and scaling AI systems", width: 736, height: 981 }],
   },
   {
     platform: "x",
-    date: "2026-10-03",
-    text: "Shipped: nl2sql now shows you the SQL before it runs anything.\n\nAccuracy didn't change. Trust went way up.",
-    url: "https://x.com/",
-    images: [{ src: "/projects/nl2sql/2-reading-the-generated-sql.png", alt: "nl2sql showing generated SQL" }],
-    metrics: { likes: 91, reposts: 12, comments: 7 },
-    placeholder: true,
+    date: "2026-05-24",
+    text: "Most prompts don't fail because they're bad. They fail because they get buried.\n\nKeep what matters close to the attention. Visibility = reliability.",
+    url: "https://x.com/itspartha_/status/2058638344918360169",
+    images: [
+      {
+        src: "/posts/x-2026-05-24.jpg",
+        alt: "Poster: most prompts don't fail because they're bad, they fail because they get buried in context. Every message, tool output and retrieved document competes for the model's attention.",
+        width: 800,
+        height: 1200,
+      },
+    ],
   },
   {
     platform: "x",
-    date: "2026-09-21",
-    text: "Four eval cases per tool catch most of what used to reach prod:\n\n1. a request the schema allows but the API rejects\n2. an error, checked for a sensible next step\n3. a list longer than one page\n4. a timeout on a write",
-    url: "https://x.com/",
-    metrics: { likes: 134, reposts: 22, comments: 11 },
-    placeholder: true,
-  },
-  {
-    platform: "linkedin",
-    date: "2026-09-02",
-    text: "New post on the blog: the AI engineer's starter kit.\n\nTerminal, Linux, git, Python environments, Docker and VS Code, everything to set up before ML and AI work.",
-    url: "https://www.linkedin.com/",
-    metrics: { likes: 87, comments: 12 },
-    placeholder: true,
-  },
-  {
-    platform: "x",
-    date: "2026-08-30",
-    text: "Bengaluru traffic has taught me more about queueing theory than any textbook.",
-    url: "https://x.com/",
-    metrics: { likes: 63, reposts: 4, comments: 5 },
-    placeholder: true,
+    date: "2026-04-12",
+    text: "90% of AI coding mistakes = bad instructions.\n\nThis repo fixes that.\n\nMost AI repos try to make models smarter. This one does the opposite. It fixes how they behave.\n\nAndrej Karpathy \u201cskills\u201d repo = instruction layer for coding agents:\n\n\u2192 stop guessing\n\u2192 ask before coding",
+    url: "https://x.com/itspartha_/status/2043315846949609717",
+    images: [{ src: "/posts/x-karpathy-skills.jpg", alt: "Screenshot of the skills repository for coding agents", width: 1200, height: 600 }],
   },
 ];
