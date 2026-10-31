@@ -2,11 +2,10 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { TopographyBackground } from "@/components/animate-ui/backgrounds/topography";
 import { Spring, SpringElement, SpringProvider } from "@animate-ui/react/primitives/spring";
 import { SplittingText } from "@animate-ui/react/primitives/texts/splitting";
-import { RotatingText, RotatingTextContainer } from "@animate-ui/react/primitives/texts/rotating";
 import { CountingNumber } from "@animate-ui/react/primitives/texts/counting-number";
 import { AnimateIcon } from "@animate-ui/react/icons";
 import { FileText } from "@/components/animate-ui/icons/file-text";
@@ -15,6 +14,7 @@ import { Rocket, Timer, Trophy } from "lucide-react";
 import type { Weather } from "@/lib/live";
 import { profile } from "@/lib/content";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-is-mobile";
 import { PhotoStack } from "./photo-stack";
 import { Tip } from "./tip";
 import { NameAudio } from "./name-audio";
@@ -44,9 +44,37 @@ function Tile({ className, children, delay = 0, label }: { className?: string; c
         className,
       )}
     >
-      {label && <p className="relative mb-2 font-mono text-[10.5px] tracking-[0.14em] text-muted-foreground uppercase">{label}</p>}
+      {label && <p className="relative mb-2 text-xs text-muted-foreground">{label}</p>}
       {children}
     </motion.div>
+  );
+}
+
+/** The role line: always a real role on screen, trading places every few seconds. */
+function RoleLine({ roles }: { roles: string[] }) {
+  const reduce = useReducedMotion();
+  const [i, setI] = React.useState(0);
+  React.useEffect(() => {
+    if (reduce) return;
+    const id = window.setInterval(() => setI((n) => (n + 1) % roles.length), 2800);
+    return () => window.clearInterval(id);
+  }, [reduce, roles.length]);
+  return (
+    <div className="relative mt-1.5 h-7 overflow-hidden py-0.5 text-base leading-6 text-muted-foreground" aria-label={roles.join(", ")}>
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={i}
+          aria-hidden
+          className="block"
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -14 }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        >
+          {roles[i]}
+        </motion.span>
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -56,7 +84,7 @@ function Scribble({ children }: { children: React.ReactNode }) {
   return (
     <span className="relative inline-block whitespace-nowrap">
       {children}
-      <svg aria-hidden viewBox="0 0 200 12" preserveAspectRatio="none" className="absolute -bottom-1.5 left-0 h-2.5 w-full text-emerald-500">
+      <svg aria-hidden viewBox="0 0 200 12" preserveAspectRatio="none" className="absolute -bottom-1.5 left-0 h-2.5 w-full text-foreground/45">
         <motion.path
           d="M2 8 C 40 3, 70 11, 104 6 S 170 2, 198 7"
           fill="none"
@@ -75,10 +103,8 @@ function Scribble({ children }: { children: React.ReactNode }) {
 function Fact({ icon: Icon, children, tip }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode; tip: string }) {
   return (
     <Tip label={tip}>
-      <span className="group/fact inline-flex cursor-default items-center gap-1.5 text-[13px] text-muted-foreground">
-        <span className="grid size-6 place-items-center rounded-md border border-border bg-background transition-transform duration-300 group-hover/fact:-rotate-12">
-          <Icon className="size-3.5 text-foreground/80" />
-        </span>
+      <span className="group/fact inline-flex cursor-default items-center gap-1.5 text-[13px] whitespace-nowrap text-muted-foreground">
+        <Icon className="size-3.5 text-foreground/70 max-sm:hidden transition-transform duration-300 group-hover/fact:-rotate-12" />
         {children}
       </span>
     </Tip>
@@ -87,6 +113,7 @@ function Fact({ icon: Icon, children, tip }: { icon: React.ComponentType<{ class
 
 export function Hero({ weather, streak, shipped }: { weather: Weather | null; streak: number | null; shipped: number }) {
   const presence = usePresence(weather);
+  const mobile = useIsMobile();
   const [copied, setCopied] = React.useState(false);
 
   return (
@@ -122,40 +149,35 @@ export function Hero({ weather, streak, shipped }: { weather: Weather | null; st
                 </SpringElement>
               </Tip>
             </SpringProvider>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-700 dark:text-emerald-300">
-              <span className="relative flex size-1.5">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500 opacity-60 motion-reduce:animate-none" />
-                <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-              </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">
+              <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
               Open to AI/ML roles
             </span>
           </div>
 
-          <h1 className="mt-4 flex items-center gap-1 text-[2.1rem] leading-[1.05] font-semibold tracking-[-0.035em] sm:text-[2.5rem]">
+          <h1 className="mt-3 flex items-center gap-1 text-[2.1rem] leading-[1.05] font-semibold tracking-[-0.035em] sm:text-[2.5rem]">
             <SplittingText text={profile.name} type="chars" stagger={0.03} />
             <NameAudio />
           </h1>
-          <RotatingTextContainer text={profile.roles} duration={2600} className="mt-1.5 h-7 py-0.5 text-base leading-6 text-muted-foreground">
-            <RotatingText />
-          </RotatingTextContainer>
+          <RoleLine roles={profile.roles} />
 
-          <p className="mt-4 max-w-[30rem] text-[15.5px] leading-relaxed text-pretty text-foreground/85">
+          <p className="mt-3 max-w-[30rem] text-[15px] leading-relaxed text-pretty text-foreground/85">
             I build AI agents, and I can&apos;t sit on an idea for long. Most of mine get <Scribble>built, shipped and shown</Scribble> within the week.
           </p>
 
-          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
+          <div className="mt-3.5 flex flex-wrap gap-x-3.5 gap-y-1.5">
             <Fact icon={Rocket} tip="Every one has a write-up below">
               <span className="font-mono text-foreground tabular-nums"><CountingNumber number={shipped} inView inViewOnce /></span> shipped
             </Fact>
             <Fact icon={Timer} tip="Customer AI prototypes at Lyzr AI">
-              prototypes in <span className="font-mono text-foreground">2–4</span> days
+              <span className="font-mono text-foreground">2–4</span> day prototypes
             </Fact>
             <Fact icon={Trophy} tip="LeetCode Knight, top 4.7% globally">
               Knight <span className="font-mono text-foreground">1887</span>
             </Fact>
           </div>
 
-          <div className="mt-auto flex items-center gap-2 pt-5">
+          <div className="mt-auto flex items-center gap-2 pt-4">
             <AnimateIcon animateOnHover asChild>
               <button
                 type="button"
@@ -184,15 +206,23 @@ export function Hero({ weather, streak, shipped }: { weather: Weather | null; st
         {/* Photos: drag them, fan them. */}
         <Tile delay={0.05} className="col-span-2 grid place-items-center overflow-visible p-0 max-sm:h-60 sm:col-span-2">
           {/* Scaled down, inside a box of the scaled size so it centres and doesn't spill. */}
-          <div className="h-[166px] w-[216px] sm:h-[152px] sm:w-[198px]">
-            <div className="origin-top-left scale-[0.72] sm:scale-[0.66]">
-              <PhotoStack />
+          {mobile ? (
+            <div className="h-[184px] w-[236px]">
+              <div className="origin-top-left scale-[0.8]">
+                <PhotoStack />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="h-[250px] w-[200px]">
+              <div className="origin-top-left" style={{ transform: "translate(-17px, 39px) scale(0.8)" }}>
+                <PhotoStack cascade />
+              </div>
+            </div>
+          )}
         </Tile>
 
         {/* What I build */}
-        <Tile delay={0.1} label="What I build · drag the nodes" className="col-span-2 sm:col-span-3">
+        <Tile delay={0.1} label="What I build" className="col-span-2 sm:col-span-3">
           <AgentGraph />
         </Tile>
 

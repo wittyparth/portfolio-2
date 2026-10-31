@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useInView, useReducedMotion } from "motion/react";
 import { Bot, Database, Gauge, PhoneCall, Sparkles, Wrench } from "lucide-react";
 import { SlidingNumber } from "@animate-ui/react/primitives/texts/sliding-number";
 import { MapPin } from "@/components/animate-ui/icons/map-pin";
@@ -27,7 +27,8 @@ const NODES: Record<NodeKey, { x: number; y: number; label: string; icon: React.
   evals: { x: 160, y: 18, label: "evals", icon: Gauge, note: "50+ test cases per voice agent before it ships." },
 };
 const W = 320;
-const H = 170;
+const H = 172;
+const STEP = 8;
 const EDGES: NodeKey[] = ["caller", "llm", "tools", "retrieval", "evals"];
 
 /**
@@ -40,6 +41,11 @@ export function AgentGraph() {
   );
   const [focus, setFocus] = React.useState<NodeKey>("agent");
   const [dragging, setDragging] = React.useState<NodeKey | null>(null);
+  // Screen readers hear a node's note only when it takes keyboard focus, never on hover.
+  const [announce, setAnnounce] = React.useState("");
+  const [touched, setTouched] = React.useState(false);
+  const wrapRef = React.useRef<HTMLDivElement>(null);
+  const inView = useInView(wrapRef, { margin: "80px" });
   const svgRef = React.useRef<SVGSVGElement>(null);
   const packets = React.useRef<(SVGCircleElement | null)[]>([]);
   const posRef = React.useRef(pos);
@@ -51,7 +57,7 @@ export function AgentGraph() {
 
   // Packets ride the wires: out to a node and back, each on its own phase. Updated directly, no re-render.
   React.useEffect(() => {
-    if (reduce) return;
+    if (reduce || !inView) return;
     let raf = 0;
     const tick = (t: number) => {
       const p = posRef.current;
@@ -67,28 +73,36 @@ export function AgentGraph() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [reduce]);
+  }, [reduce, inView]);
 
   const toSvg = (e: React.PointerEvent) => {
     const svg = svgRef.current;
     const m = svg?.getScreenCTM();
     if (!svg || !m) return null;
     const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse());
-    return { x: Math.min(W - 14, Math.max(14, pt.x)), y: Math.min(H - 20, Math.max(14, pt.y)) };
+    return { x: Math.min(W - 14, Math.max(14, pt.x)), y: Math.min(H - 26, Math.max(14, pt.y)) };
   };
 
+  const nudge = (k: NodeKey, dx: number, dy: number) =>
+    setPos((s) => ({
+      ...s,
+      [k]: { x: Math.min(W - 14, Math.max(14, s[k].x + dx)), y: Math.min(H - 26, Math.max(14, s[k].y + dy)) },
+    }));
+
   return (
-    <div className="relative">
+    <div className="relative" ref={wrapRef}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full touch-none select-none"
+        className="w-full select-none"
         onPointerMove={(e) => {
           if (!dragging) return;
           const p = toSvg(e);
           if (p) setPos((s) => ({ ...s, [dragging]: p }));
         }}
         onPointerUp={() => setDragging(null)}
+        onPointerCancel={() => setDragging(null)}
+        onLostPointerCapture={() => setDragging(null)}
         onPointerLeave={() => setDragging(null)}
         role="group"
         aria-label="Diagram of an AI agent: phone call, LLM, tools, retrieval and evals around an agent"
@@ -140,13 +154,29 @@ export function AgentGraph() {
             <g
               key={k}
               transform={`translate(${pos[k].x} ${pos[k].y})`}
-              className={cn("outline-none", dragging === k ? "cursor-grabbing" : "cursor-grab")}
+              className={cn("touch-none outline-none", dragging === k ? "cursor-grabbing" : "cursor-grab")}
               tabIndex={0}
               role="button"
-              aria-label={`${n.label}: ${n.note}`}
+              aria-label={`${n.label}, draggable. Arrow keys move it, Enter reads the note.`}
               onPointerEnter={() => setFocus(k)}
-              onFocus={() => setFocus(k)}
+              onFocus={() => {
+                setFocus(k);
+                setAnnounce(`${n.label}: ${n.note}`);
+              }}
+              onKeyDown={(e) => {
+                const d = { ArrowLeft: [-STEP, 0], ArrowRight: [STEP, 0], ArrowUp: [0, -STEP], ArrowDown: [0, STEP] }[e.key];
+                if (d) {
+                  e.preventDefault();
+                  setTouched(true);
+                  nudge(k, d[0], d[1]);
+                } else if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setFocus(k);
+                  setAnnounce(`${n.label}: ${n.note}`);
+                }
+              }}
               onPointerDown={(e) => {
+                setTouched(true);
                 (e.target as Element).setPointerCapture?.(e.pointerId);
                 setDragging(k);
                 setFocus(k);
@@ -170,17 +200,26 @@ export function AgentGraph() {
                   strokeWidth={1.8}
                 />
               </motion.g>
-              <text y={r + 11} textAnchor="middle" className="fill-muted-foreground font-mono text-[8.5px]">
+              <text y={r + 15} textAnchor="middle" className="fill-muted-foreground text-[12px]">
                 {n.label}
               </text>
             </g>
           );
         })}
       </svg>
-      <p className="mt-1 min-h-[2.5rem] text-[13px] leading-snug text-pretty text-muted-foreground" aria-live="polite">
-        <span className="font-mono text-foreground">{NODES[focus].label} · </span>
+      <motion.span
+        aria-hidden
+        className="pointer-events-none absolute top-0 right-0 text-xs text-muted-foreground"
+        animate={{ opacity: touched ? 0 : 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        drag the nodes
+      </motion.span>
+      <p className="mt-1 min-h-[2.5rem] text-[13px] leading-snug text-pretty text-muted-foreground">
+        <span className="font-medium text-foreground">{NODES[focus].label} · </span>
         {NODES[focus].note}
       </p>
+      <span className="sr-only" aria-live="polite">{announce}</span>
     </div>
   );
 }
@@ -200,13 +239,23 @@ const STOPS = [
 export function Journey() {
   const [active, setActive] = React.useState(2);
   const reduce = useReducedMotion();
+  const wrapRef = React.useRef<HTMLDivElement>(null);
+  const svgRef = React.useRef<SVGSVGElement>(null);
+  const inView = useInView(wrapRef, { margin: "80px" });
+  // The travelling pulse only runs while the tile is on screen.
+  React.useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg || reduce) return;
+    if (inView) svg.unpauseAnimations();
+    else svg.pauseAnimations();
+  }, [inView, reduce]);
   const s = STOPS[active];
   const edu = active === 0;
 
   return (
-    <div>
+    <div ref={wrapRef}>
       <div className="relative w-full" style={{ aspectRatio: `${JW} / ${JH}` }}>
-        <svg viewBox={`0 0 ${JW} ${JH}`} className="absolute inset-0 size-full" aria-hidden>
+        <svg ref={svgRef} viewBox={`0 0 ${JW} ${JH}`} className="absolute inset-0 size-full" aria-hidden>
           <path d={JPATH} className="fill-none stroke-foreground/10" strokeWidth={6} strokeLinecap="round" />
           <motion.path
             d={JPATH}
@@ -247,7 +296,7 @@ export function Journey() {
               </span>
               <span
                 className={cn(
-                  "absolute top-full left-1/2 mt-1 -translate-x-1/2 font-mono text-[10px] whitespace-nowrap",
+                  "absolute top-full left-1/2 mt-1 -translate-x-1/2 font-mono text-[11px] whitespace-nowrap",
                   isEdu ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground",
                 )}
               >
@@ -257,14 +306,14 @@ export function Journey() {
           );
         })}
       </div>
-      <div className="mt-4 min-h-[2.75rem]" aria-live="polite">
+      <div className="mt-4 min-h-[2.75rem]">
         <p className="flex items-center gap-2 text-sm font-medium tracking-tight">
           {s.commit.company}
           {edu && (
-            <span className="rounded-full bg-amber-500/15 px-1.5 font-mono text-[10px] leading-4 text-amber-800 dark:text-amber-200">IIT alum</span>
+            <span className="rounded-full bg-amber-500/15 px-1.5 font-mono text-[11px] leading-4 text-amber-800 dark:text-amber-200">IIT alum</span>
           )}
         </p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs leading-snug text-muted-foreground">
           {s.commit.role} · {s.extra}
         </p>
       </div>
@@ -277,16 +326,18 @@ export function Journey() {
 export function useIst() {
   const [t, setT] = React.useState<{ h: number; m: number } | null>(null);
   React.useEffect(() => {
+    let id = 0;
     const tick = () => {
       const [h, m] = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: profile.timezone })
         .format(new Date())
         .split(":")
         .map(Number);
       setT((p) => (p && p.h === h && p.m === m ? p : { h, m }));
+      // Wake on the next minute boundary, not every second.
+      id = window.setTimeout(tick, 60_000 - (Date.now() % 60_000) + 50);
     };
     tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
+    return () => clearTimeout(id);
   }, []);
   return t;
 }
@@ -352,7 +403,7 @@ export function LocalStrip({ weather, streak }: { weather: Weather | null; strea
             ) : (
               <span className="opacity-0">00:00</span>
             )}
-            <span className="ml-1.5 text-[10px] text-muted-foreground">IST</span>
+            <span className="ml-1.5 text-[11px] text-muted-foreground">IST</span>
           </p>
           <p className="flex items-center gap-1 text-xs text-muted-foreground">
             <MapPin size={12} animateOnHover /> {profile.city}, India
@@ -368,7 +419,7 @@ export function LocalStrip({ weather, streak }: { weather: Weather | null; strea
             {weather.label}
           </span>
         )}
-        {streak !== null && streak > 0 && (
+        {streak !== null && streak >= 2 && (
           <Tip label="Consecutive days with a commit">
             <span className="inline-flex cursor-default items-center gap-1">
               <Flame size={15} animateOnHover className="text-orange-500" />

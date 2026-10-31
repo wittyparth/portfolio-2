@@ -43,8 +43,8 @@ export function HomeProjects({ featured, all }: { featured: Project[]; all: Proj
   return (
     <div>
       <div className="mb-5 flex items-center justify-between gap-4">
-        <p className="font-mono text-xs text-muted-foreground">
-          {featured.length} featured of {all.length}, all shipped
+        <p className="text-sm text-muted-foreground">
+          {view === "table" && expanded ? `All ${all.length} projects` : `${featured.length} featured of ${all.length}`}
         </p>
         <ViewToggle
           value={view}

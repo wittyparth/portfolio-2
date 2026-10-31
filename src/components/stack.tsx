@@ -111,7 +111,7 @@ function StarButton({
         "--brand": star.hex ?? "var(--foreground)",
       } as React.CSSProperties}
       className={cn(
-        "group/star absolute grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border bg-background transition-[opacity,color,border-color,box-shadow,scale] duration-300 outline-none",
+        "group/star absolute grid after:absolute after:-inset-2 after:content-[''] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border bg-background transition-[opacity,color,border-color,box-shadow,scale] duration-300 outline-none",
         "hover:z-10 hover:scale-125 hover:border-(--brand) hover:text-(--brand) hover:shadow-[0_0_18px_-2px_var(--brand)] focus-visible:z-10 focus-visible:scale-125 focus-visible:text-(--brand) focus-visible:ring-2 focus-visible:ring-ring/60",
         star.level === "daily" ? "border-foreground/35" : star.level === "often" ? "border-foreground/20" : "border-foreground/10 [&>img]:opacity-75 [&>svg]:opacity-75",
         selected && "z-10 scale-125 border-(--brand) text-(--brand) shadow-[0_0_22px_-2px_var(--brand)]",
@@ -148,7 +148,7 @@ function Detail({ star, usedIn, onClose }: { star: Star; usedIn: { slug: string;
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-baseline gap-x-2">
           <p className="font-medium">{star.name}</p>
-          <p className="font-mono text-[11px] text-muted-foreground uppercase">
+          <p className="text-xs text-muted-foreground">
             {SKY[star.cluster].name} · {level.label}
           </p>
         </div>
@@ -164,7 +164,7 @@ function Detail({ star, usedIn, onClose }: { star: Star; usedIn: { slug: string;
           </p>
         )}
       </div>
-      <button type="button" onClick={onClose} aria-label="Close" className="self-start text-sm text-muted-foreground hover:text-foreground">
+      <button type="button" onClick={onClose} aria-label="Close" className="-mt-1 -mr-1 grid size-7 shrink-0 place-items-center self-start rounded-full text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
         ✕
       </button>
     </motion.div>
@@ -197,7 +197,7 @@ function Shelf({
         <div className="space-y-6 pb-1">
           {shown.map((g) => (
             <section key={g.name} aria-label={g.category}>
-              <h3 className="mb-2.5 flex items-baseline gap-2 font-mono text-[11px] tracking-[0.14em] text-muted-foreground uppercase">
+              <h3 className="mb-2.5 flex items-baseline gap-2 text-sm font-medium text-foreground/80">
                 {g.category}
                 <span className="tabular-nums opacity-60">{g.items.length}</span>
               </h3>
@@ -241,8 +241,7 @@ export function Stack({ usedIn }: { usedIn: Record<string, { slug: string; name:
   const [view, setView] = React.useState<"sky" | "shelf">("sky");
   const [hover, setHover] = React.useState<Star | null>(null);
   const [selected, setSelected] = React.useState<Star | null>(null);
-  const [focusCluster, setFocusCluster] = React.useState<number | null>(null);
-  const lit = hover?.cluster ?? focusCluster ?? selected?.cluster ?? null;
+  const lit = hover?.cluster ?? selected?.cluster ?? null;
   // Heights are measured in px so the fold can animate; aspect-ratio changes can't.
   const skyRef = React.useRef<HTMLDivElement>(null);
   const [width, setWidth] = React.useState(0);
@@ -255,6 +254,8 @@ export function Stack({ usedIn }: { usedIn: Record<string, { slug: string; name:
   }, []);
   const scale = width / W;
   const height = scale ? (expanded ? H : rowH - 6) * scale : undefined;
+  // Constellation names stay 12px on screen however far the chart is scaled down.
+  const labelSize = scale ? Math.round((12 / scale) * 10) / 10 : 14;
   const counts = { daily: 0, often: 0, dabbled: 0 };
   for (const s of stack) counts[s.level]++;
 
@@ -278,10 +279,7 @@ export function Stack({ usedIn }: { usedIn: Record<string, { slug: string; name:
         <FilterTabs
           label="Stack view"
           value={view}
-          onChange={(v) => {
-            setView(v);
-            setFocusCluster(null);
-          }}
+          onChange={setView}
           options={[
             { value: "sky", label: <><Sparkles size={14} />Sky</> },
             { value: "shelf", label: <><LayoutGrid className="size-3.5" />Shelf</> },
@@ -328,14 +326,15 @@ export function Stack({ usedIn }: { usedIn: Record<string, { slug: string; name:
                 <text
                   key={c.name}
                   x={col * 280 + 16}
-                  y={row * rowH + 26}
+                  y={row * rowH + 14 + labelSize}
+                  fontSize={labelSize}
                   className={cn(
-                    "font-mono text-[11px] tracking-[0.14em] uppercase transition-[fill] duration-300",
-                    lit === i ? "fill-foreground" : "fill-muted-foreground/70",
+                    "font-medium transition-[fill] duration-300",
+                    lit === i ? "fill-foreground" : "fill-muted-foreground",
                   )}
                 >
                   {c.name}
-                  <tspan className="fill-muted-foreground/50"> · {c.category}</tspan>
+                  <tspan className="fill-muted-foreground/70 font-normal"> · {c.category}</tspan>
                 </text>
               );
             })}
@@ -356,7 +355,7 @@ export function Stack({ usedIn }: { usedIn: Record<string, { slug: string; name:
         </div>
         {/* Hover label: the star's name, near the bottom of the sky. */}
         {hover && (
-          <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center font-mono text-xs text-foreground/80">
+          <p className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-xs text-foreground/80">
             {hover.name} · {LEVEL[hover.level].label.toLowerCase()}
           </p>
         )}
@@ -369,35 +368,15 @@ export function Stack({ usedIn }: { usedIn: Record<string, { slug: string; name:
       {selected && <Detail star={selected} usedIn={usedIn[selected.key] ?? []} onClose={() => setSelected(null)} />}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        {view === "sky" ? (
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Light up a constellation">
-          {SKY.map((c, i) => (
-            <button
-              key={c.name}
-              type="button"
-              aria-pressed={focusCluster === i}
-              onClick={() => {
-                setFocusCluster(focusCluster === i ? null : i);
-                if (Math.floor(i / cols) > 0) setExpanded(true);
-              }}
-              className={cn(
-                "rounded-full border px-2.5 py-1 text-xs transition-colors",
-                focusCluster === i ? "border-foreground/40 bg-accent text-foreground" : "border-border text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {c.category}
-            </button>
-          ))}
-        </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">Tap any tool for where I&apos;ve used it.</p>
-        )}
+        <p className="text-xs text-muted-foreground">
+          {view === "sky" ? "Hover a star to light its constellation, tap for where I used it." : "Tap any tool for where I\u2019ve used it."}
+        </p>
         <AnimateIcon animateOnHover asChild>
           <button
             type="button"
             aria-expanded={expanded}
             onClick={() => setExpanded((e) => !e)}
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="inline-flex min-h-7 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             {expanded ? (view === "sky" ? "Fold the sky" : "Fold the shelf") : `Show all ${stack.length}`}
             <ChevronDown size={14} className={cn("transition-transform duration-300", expanded && "rotate-180")} />
