@@ -1,0 +1,57 @@
+---
+# The repo is private, so there is no public source link. TODO: add repo: back if you make it public.
+name: Voice Studio
+tagline: A web app for building, testing and running AI phone agents, from script to a self-managing outbound calling queue.
+year: 2026
+status: shipped
+stack: [Next.js, TypeScript, MongoDB, LiveKit, Lyzr, React, Docker, Tailwind CSS]
+---
+
+{/* TODO: confirm the repo link. The README calls this a private repository, so the GitHub link will 404 for visitors. Remove `repo` if it should stay private. */}
+
+## The problem
+
+A voice agent that demos well often falls apart on a real call. The script is too long or too thin, nobody has tested what it does when the person interrupts or says "stop calling me", and once it is live, someone still has to decide who to call back, and when.
+
+## The approach
+
+Voice Studio covers the whole path, in one app. The telephony, speech-to-text and text-to-speech run on Lyzr (Voice on LiveKit, and Agent Studio for the text agents). What I built is the product layer on top.
+
+- **Coach.** An AI interview for a vertical such as appointment reminders, collections or outbound sales. It asks only what matters, recommends answers, and writes a sectioned call script plus the voice configuration. Compliance lines (identity check, recording and AI disclosure, no over-promising) are added by code if the model leaves them out, and a word budget keeps scripts short enough for a live agent to re-read every turn.
+- **Test and Refine.** Simulated callers run scenarios against the script, a judge scores each call, a red-team set tries interruptions, prompt injection and similar attacks, and fixes are proposed from the failing transcripts and checked for regressions before they are applied.
+- **Playground.** Talk to the deployed agent in the browser over LiveKit.
+- **Knowledge bases.** Lyzr RAG knowledge bases from files, text, websites or Google Drive, attached per agent.
+- **Campaigns and queue.** Run an agent over a contact list. The queue handles priority, calling windows per timezone, attempt caps and automatic recalls, and shows a live view.
+- **Analytics.** Reach and outcome funnels, with drill-down to the calls behind a number and CSV or XLSX export.
+
+The repo also holds a blog of long-form articles about voice-agent design, rendered from markdown.
+
+## Architecture
+
+It is a single Next.js app (UI and API routes) with one MongoDB, shipped as one Docker image. The queue worker runs inside the same Node process, started from `instrumentation.ts`, so it has to run as a single instance. Live queue updates reach the browser over Server-Sent Events, fed by an in-process event emitter.
+
+The queue picks the next eligible contact, composes the agent config, campaign settings and that contact's variables, and asks Lyzr Voice to place the call. When the call ends, Lyzr posts a signed `transcript.ready` webhook. The app fetches the transcript, classifies the outcome, decides the follow-up and advances the queue. A 45 second sweep covers what the webhook cannot: scheduled calls that are now due, and calls whose webhook never arrived.
+
+<Architecture />
+
+## The model classifies, the code decides
+
+After a call, a Lyzr classifier agent reads the transcript and returns structured facts: what answered (human, voicemail, call screener), the contact's intent, whether they opted out, and any callback phrase. It does not decide when to call again. A pure function, `computeRecall`, does that from those facts, the calling window, the attempt count and the campaign's tuning, so the model never does calendar arithmetic.
+
+Between the two sits a validation step. Where it matters, the code can only make the model's answer stricter. A phrase-based opt-out check runs next to the classifier and wins if it finds a refusal the model missed:
+
+```ts title="src/server/calls/post-call-decision.ts"
+// Opt-out: the agent's reading, made stricter (never looser) by the backstop.
+const optOut: "all" | "ai" | null = result.optOut === "all" || backstop === "all" ? "all" : result.optOut ?? backstop;
+if (optOut === "all") result.doNotCall = true;
+```
+
+The same split shows up in the Coach, where required compliance lines are checked and injected by code. Since the decision functions take the classifier as a parameter and do no database access, I could unit test them without a network.
+
+## What I learned
+
+{/* TODO: rewrite in your own words */}
+Keep the model on judgment calls and put anything with a hard rule, like opt-outs, compliance wording and when to retry, in plain code that can be tested. I also learned how much of a calling product is edge cases: late webhooks, calls an operator stopped, timezones and daylight saving.
+
+{/* TODO: confirm status and whether real outbound calls are running. The README says it is tested in simulation, the Playground and the queue engine, and that real calls need valid Lyzr voice credentials. */}
+{/* TODO: confirm year. The repo has one squashed commit dated 2026-10-24 so creation date is not visible. */}

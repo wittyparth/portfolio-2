@@ -1,0 +1,60 @@
+{
+  "title": "How a planning task flows",
+  "lanes": [
+    { "id": "client", "label": "Client" },
+    { "id": "api", "label": "API" },
+    { "id": "queue", "label": "Queues and workers" },
+    { "id": "data", "label": "Data" },
+    { "id": "observe", "label": "Observability" }
+  ],
+  "nodes": [
+    { "id": "api-client", "label": "API client", "lane": "client", "row": 0, "kind": "client", "note": "Swagger UI, the Postman collection or a script calling the REST API." },
+    { "id": "load-tests", "label": "Locust and k6 tests", "lane": "client", "row": 1, "kind": "client", "note": "backend/stress-testing: Locust user journeys, a staged k6 script and monitor scripts that hammer the same endpoints." },
+    { "id": "timing-mw", "label": "Timing middleware", "lane": "api", "row": 0, "kind": "gateway", "tech": "FastAPI", "note": "core/middleware.py: RequestTimingMiddleware logs method, path, status and latency in ms for every request." },
+    { "id": "routers", "label": "REST routers", "lane": "api", "row": 1, "kind": "service", "tech": "FastAPI", "note": "api/v1/endpoints: walls, obstacles, tasks, trajectories. POST /tasks returns 202 and hands the work to RabbitMQ." },
+    { "id": "cache-layer", "label": "Cache helpers", "lane": "api", "row": 2, "kind": "service", "tech": "Redis", "note": "core/cache.py: cache_get, cache_set and cache_delete over JSON. Read-through on tasks, walls and trajectories, invalidated on writes." },
+    { "id": "producer", "label": "Queue producer", "lane": "api", "row": 3, "kind": "service", "tech": "RabbitMQ", "note": "services/queue_producer.py: pika publisher that declares a durable queue and sends persistent messages." },
+    { "id": "planning-queue", "label": "path_planning_queue", "lane": "queue", "row": 0, "kind": "queue", "tech": "RabbitMQ", "note": "Durable RabbitMQ queue carrying task_id, wall_id and robot_id. Failed messages are rejected without requeue." },
+    { "id": "cloud-worker", "label": "Cloud worker", "lane": "queue", "row": 1, "kind": "worker", "tech": "Python", "note": "services/cloud_worker.py: consumes one message at a time, sets PROCESSING, runs the planner, saves trajectories, sets COMPLETED or FAILED." },
+    { "id": "planner", "label": "Coverage planner", "lane": "queue", "row": 2, "kind": "service", "tech": "Shapely", "note": "planning/coverage_planner.py: free space via Shapely, 2m blocks, zigzag sweeps, genetic-algorithm block order, simple detour between blocks." },
+    { "id": "robot-queue", "label": "robot_123_queue", "lane": "queue", "row": 3, "kind": "queue", "tech": "RabbitMQ", "note": "Per-robot command queue. The worker publishes the Standard Sweep waypoints here." },
+    { "id": "robot-sim", "label": "Robot simulator", "lane": "queue", "row": 4, "kind": "worker", "tech": "Python", "note": "services/robot_client.py: consumes waypoints, sleeps 2s per move to simulate travel and reports progress after each waypoint." },
+    { "id": "telemetry-queue", "label": "robot_live_telemetry", "lane": "queue", "row": 5, "kind": "queue", "tech": "RabbitMQ", "note": "Queue the simulator publishes position and progress to. Nothing in this repo consumes it, so it acts as a hook for a future dashboard." },
+    { "id": "redis", "label": "Redis", "lane": "data", "row": 0, "kind": "cache", "tech": "Redis", "note": "Caches task_{id} and traj_{id} JSON with a one hour TTL so status polling skips PostgreSQL." },
+    { "id": "postgres", "label": "PostgreSQL (Neon)", "lane": "data", "row": 1, "kind": "database", "tech": "PostgreSQL", "note": "SQLAlchemy models Wall, Obstacle (JSONB geometry), Task and Trajectory (JSONB waypoints). Alembic migrations." },
+    { "id": "logstash", "label": "Logstash", "lane": "observe", "row": 0, "kind": "service", "tech": "Elasticsearch", "note": "Listens on TCP 5959 for JSON logs from python-logstash-async and writes them on to Elasticsearch." },
+    { "id": "elasticsearch", "label": "Elasticsearch", "lane": "observe", "row": 1, "kind": "database", "tech": "Elasticsearch", "note": "Stores one python-logs index per day, including latency, algorithm timing and per-scenario coverage fields." },
+    { "id": "kibana", "label": "Kibana", "lane": "observe", "row": 2, "kind": "service", "tech": "Elasticsearch", "note": "Dashboards over the log index, for request latency and scenario metrics." }
+  ],
+  "edges": [
+    { "from": "api-client", "to": "timing-mw", "label": "REST", "style": "sync" },
+    { "from": "load-tests", "to": "timing-mw", "label": "HTTP load", "style": "sync" },
+    { "from": "timing-mw", "to": "routers", "label": "timed request", "style": "sync" },
+    { "from": "routers", "to": "postgres", "label": "SQL", "style": "sync" },
+    { "from": "routers", "to": "cache-layer", "label": "read-through", "style": "sync" },
+    { "from": "cache-layer", "to": "redis", "label": "GET, SETEX", "style": "sync" },
+    { "from": "routers", "to": "producer", "label": "publish_task", "style": "async" },
+    { "from": "producer", "to": "planning-queue", "label": "AMQP, persistent", "style": "async" },
+    { "from": "planning-queue", "to": "cloud-worker", "label": "consume, prefetch 1", "style": "async" },
+    { "from": "cloud-worker", "to": "postgres", "label": "status, trajectories", "style": "sync" },
+    { "from": "cloud-worker", "to": "redis", "label": "task status cache", "style": "sync" },
+    { "from": "cloud-worker", "to": "planner", "label": "3 tool-radius scenarios", "style": "sync" },
+    { "from": "cloud-worker", "to": "robot-queue", "label": "Standard Sweep path", "style": "async" },
+    { "from": "robot-queue", "to": "robot-sim", "label": "consume waypoints", "style": "async" },
+    { "from": "robot-sim", "to": "telemetry-queue", "label": "progress messages", "style": "async" },
+    { "from": "timing-mw", "to": "logstash", "label": "request latency logs", "style": "async" },
+    { "from": "cloud-worker", "to": "logstash", "label": "scenario metrics", "style": "async" },
+    { "from": "robot-sim", "to": "logstash", "label": "telemetry logs", "style": "async" },
+    { "from": "logstash", "to": "elasticsearch", "label": "index logs", "style": "async" },
+    { "from": "kibana", "to": "elasticsearch", "label": "query", "style": "sync" }
+  ],
+  "flow": [
+    "A client POSTs a task for a wall. The timing middleware starts a timer and the router checks the wall exists in PostgreSQL.",
+    "The router saves the task as PENDING, caches its state in Redis and publishes a persistent message to path_planning_queue, then returns 202 Accepted.",
+    "The cloud worker takes one message, marks the task PROCESSING in PostgreSQL and Redis, and loads the wall and its obstacles.",
+    "The coverage planner runs three scenarios (tool radius 0.2, 0.5 and 1.0) and the worker saves each trajectory.",
+    "The worker marks the task COMPLETED, refreshes the Redis entry and publishes the Standard Sweep waypoints to the robot's queue.",
+    "The client polls GET /tasks/{id}, served from Redis, then reads the trajectories from GET /trajectories/{task_id}.",
+    "Secondary path: the robot simulator walks the waypoints, publishes progress telemetry, and the API, worker and robot all log JSON through Logstash into Elasticsearch for Kibana."
+  ]
+}

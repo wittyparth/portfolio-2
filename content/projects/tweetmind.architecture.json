@@ -1,0 +1,61 @@
+{
+  "title": "How a generation request flows",
+  "lanes": [
+    { "id": "client", "label": "Extension" },
+    { "id": "api", "label": "API layer" },
+    { "id": "services", "label": "Services" },
+    { "id": "data", "label": "Data" },
+    { "id": "external", "label": "External" }
+  ],
+  "nodes": [
+    { "id": "panel", "label": "Side panel + popup", "lane": "client", "row": 0, "kind": "client", "tech": "React", "note": "React UI with tabs for generating tweets, analyzing a profile, personas, history and settings. Calls the backend through src/lib/api.ts." },
+    { "id": "content", "label": "Content scripts on X", "lane": "client", "row": 1, "kind": "client", "tech": "TypeScript", "note": "A MutationObserver injects AI Reply, quote and viral actions into x.com compose flows. replyComposer, quote and viral call generateVariants directly." },
+    { "id": "worker", "label": "Service worker", "lane": "client", "row": 2, "kind": "worker", "tech": "TypeScript", "note": "Manifest V3 background script: opens the side panel, opens the profile tab for tweet scraping, relays EXTRACT_* progress messages and handles media downloads." },
+    { "id": "storage", "label": "chrome.storage.local", "lane": "client", "row": 3, "kind": "storage", "note": "Holds settings, the Supabase session and a local generation history. The extension never keeps a provider key here." },
+    { "id": "app", "label": "FastAPI app", "lane": "api", "row": 0, "kind": "gateway", "tech": "FastAPI", "note": "main.py: CORS for x.com and a chrome-extension origin regex, a lifespan hook that connects Redis, a /health route and the /v1 routers." },
+    { "id": "authn", "label": "JWT verification", "lane": "api", "row": 1, "kind": "service", "tech": "Python", "note": "core/auth.py: fetches Supabase's JWKS (cached with a TTL), accepts RS256 or ES256 tokens only, and exposes get_current_user. A dev bypass flag exists." },
+    { "id": "ratelimit", "label": "Rate limiter", "lane": "api", "row": 2, "kind": "service", "tech": "Redis", "note": "core/rate_limit.py: per-minute counters for each user and each IP using INCR and EXPIRE, falling back to in-memory counters if Redis errors." },
+    { "id": "generation", "label": "Generation service", "lane": "services", "row": 0, "kind": "service", "tech": "Python", "note": "Builds the system and user prompts from mode, tone, hook style, goal, emotion and profile. Expects exactly 3 JSON variants, retries once with a repair prompt." },
+    { "id": "profile", "label": "Profile analysis", "lane": "services", "row": 1, "kind": "service", "tech": "Python", "note": "Cleans and dedupes scraped tweets, then runs three LLM passes (structure, vocabulary, persona), each retried once, and merges them into a voice profile." },
+    { "id": "vault", "label": "Key vault", "lane": "services", "row": 2, "kind": "service", "tech": "Python", "note": "Encrypts each provider key with Fernet (key derived from TWEETMIND_ENCRYPTION_KEY) before storing it and returns only the last four characters." },
+    { "id": "history", "label": "History + personas", "lane": "services", "row": 3, "kind": "service", "tech": "Python", "note": "Writes each generation to history and serves the history and persona CRUD routes. A failed history write is logged and does not fail the request." },
+    { "id": "usage", "label": "Usage tracker", "lane": "services", "row": 4, "kind": "service", "tech": "Python", "note": "Counts generations and approximate tokens per user per day against a daily limit (default 200)." },
+    { "id": "supabase", "label": "Supabase Postgres", "lane": "data", "row": 0, "kind": "database", "tech": "Supabase", "note": "Tables user_provider_keys, voice_profiles and generation_history, plus personas. Accessed over PostgREST with a service-role key from infra/supabase_store.py." },
+    { "id": "redis", "label": "Redis", "lane": "data", "row": 1, "kind": "cache", "tech": "Redis", "note": "Rate-limit counters (rl:user, rl:ip) and daily usage hashes (usage:<user>:<date>, kept 7 days)." },
+    { "id": "providers", "label": "User's LLM provider", "lane": "external", "row": 0, "kind": "llm", "tech": "OpenAI API", "note": "provider_adapter.py calls OpenAI, Anthropic, Gemini, Groq or OpenRouter over httpx with the user's own key." },
+    { "id": "supaauth", "label": "Supabase Auth", "lane": "external", "row": 1, "kind": "external", "tech": "Supabase", "note": "Email and Google sign-in through supabase-js. Google goes via chrome.identity.launchWebAuthFlow. Issues the JWT the backend verifies." },
+    { "id": "x", "label": "X (x.com)", "lane": "external", "row": 2, "kind": "external", "note": "The page the content scripts read from and write into. Profile tweets are scraped from here in a tab opened by the service worker." }
+  ],
+  "edges": [
+    { "from": "panel", "to": "app", "label": "REST + Bearer JWT", "style": "sync" },
+    { "from": "content", "to": "app", "label": "REST + Bearer JWT", "style": "sync" },
+    { "from": "content", "to": "worker", "label": "OPEN_SIDE_PANEL, EXTRACT_*", "style": "async" },
+    { "from": "content", "to": "x", "label": "inject UI, read tweets", "style": "sync" },
+    { "from": "panel", "to": "storage", "label": "settings, session", "style": "sync" },
+    { "from": "panel", "to": "supaauth", "label": "sign-in", "style": "sync" },
+    { "from": "app", "to": "authn", "label": "get_current_user", "style": "sync" },
+    { "from": "authn", "to": "supaauth", "label": "fetch JWKS", "style": "sync" },
+    { "from": "app", "to": "ratelimit", "label": "enforce_rate_limit", "style": "sync" },
+    { "from": "ratelimit", "to": "redis", "label": "INCR + EXPIRE", "style": "sync" },
+    { "from": "app", "to": "generation", "label": "POST /generate/*", "style": "sync" },
+    { "from": "app", "to": "profile", "label": "POST /profile/analyze", "style": "sync" },
+    { "from": "generation", "to": "vault", "label": "fetch provider key", "style": "sync" },
+    { "from": "vault", "to": "supabase", "label": "encrypted key rows", "style": "sync" },
+    { "from": "generation", "to": "providers", "label": "LLM call (httpx)", "style": "sync" },
+    { "from": "profile", "to": "providers", "label": "3 LLM calls", "style": "sync" },
+    { "from": "generation", "to": "usage", "label": "record tokens", "style": "sync" },
+    { "from": "usage", "to": "redis", "label": "HINCRBY usage hash", "style": "sync" },
+    { "from": "generation", "to": "history", "label": "add history entry", "style": "sync" },
+    { "from": "history", "to": "supabase", "label": "history, personas", "style": "sync" },
+    { "from": "profile", "to": "supabase", "label": "voice profile upsert", "style": "sync" }
+  ],
+  "flow": [
+    "A content script or the side panel sends the idea and its parameters to POST /v1/generate/tweet with the Supabase access token.",
+    "The backend verifies the JWT against Supabase's cached JWKS, then checks the per-user and per-IP rate limits in Redis.",
+    "The route checks that a provider key exists and that the daily generation limit is not used up. The key vault decrypts the key.",
+    "The generation service builds the prompt from the idea, voice profile and parameters and calls the chosen provider.",
+    "It expects exactly three variants as JSON. If not, it makes one repair call at a lower temperature, then filters variants against the blocklist.",
+    "Usage is recorded in Redis, the result is written to history in Supabase, and the three variants go back to the extension.",
+    "Secondary path: analyzing a profile makes the service worker open the profile in a tab, scrape tweets and relay progress. The backend then runs its three analysis passes and saves the voice profile."
+  ]
+}

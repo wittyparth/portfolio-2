@@ -1,0 +1,63 @@
+---
+name: InferX
+tagline: An MLOps platform for deploying, versioning and serving scikit-learn models, with repeat predictions cached down to 2ms.
+year: 2025
+status: shipped
+stack: [FastAPI, PostgreSQL, Redis, SQLAlchemy, Next.js, Docker, Pydantic, pytest]
+repo: https://github.com/wittyparth/InferX
+live: https://www.inferx.site/
+role: Solo
+featured: true
+order: 2
+---
+
+## The problem
+
+Every model deployment seems to start the same way: a hand-written Flask endpoint, no versioning, no record of what changed and no idea how it performs once it's live.
+
+## The approach
+
+InferX turns deployment into an upload. You upload a scikit-learn model and get a versioned prediction endpoint, API keys, rate limits, webhooks and a dashboard for its traffic, without writing any serving code.
+
+- **35+ REST endpoints** for deployment, versioning and real-time inference, behind a modular service layer designed from HLD and LLD up.
+- **Auth and abuse protection from the start:** JWT and OAuth 2.0 login, hashed API keys, per-model sharing, Argon2 password hashing, HMAC-signed webhooks and Redis-backed rate limits on every route.
+
+{/* TODO: confirm "token-bucket across 8 tiers" from the resume. The code I found uses a Redis sorted-set sliding window with per-route limits in rate_limit_config.py. */}
+
+## Architecture
+
+A Next.js dashboard and direct API clients both talk to one FastAPI app. The app keeps users, model metadata and prediction logs in PostgreSQL through SQLAlchemy, stores model files on S3 (or local disk in development), and uses Redis for two things: cached predictions and rate-limit counters.
+
+Anything the caller doesn't need to wait for, like writing the prediction log, caching the result and firing webhooks, runs as a FastAPI background task after the response is sent.
+
+<Architecture />
+
+## Making inference fast
+
+A prediction request builds a cache key from the model id, version and a SHA-256 hash of the sorted input JSON. A hit returns straight from Redis. A miss loads the model through an in-process LRU of loaded models, runs `predict`, and queues the cache write, the database log and the webhooks for after the response.
+
+```python title="Backend/app/core/caching.py"
+def _generate_cache_key(self, model_id: str, input_data: Any, version: Optional[int] = None) -> str:
+    # Key format: pred:{model_id}:{version}:{input_hash}
+    input_json = json.dumps(input_data, sort_keys=True, default=str)
+    input_hash = hashlib.sha256(input_json.encode()).hexdigest()[:16]
+
+    version_str = str(version) if version else "latest"
+    return f"pred:{model_id}:{version_str}:{input_hash}"
+```
+
+Including the version in the key means a new model version never serves a stale answer, and `sort_keys` means `{"a":1,"b":2}` and `{"b":2,"a":1}` share an entry. Cached entries expire after an hour, and a model's entries can be invalidated with one call.
+
+<Callout type="tip">
+  The 200ms to 2ms figure is for cached predictions. Most of the win came from caching, because real inference traffic repeats itself far more than you'd expect.
+</Callout>
+
+## Shipping it
+
+- Docker multi-stage builds (base, dependencies, development, production) cut the image size by **65%**.
+- **77% test coverage** from 39+ pytest suites, with Pydantic-validated request and response schemas, and a GitHub Actions workflow that runs them against real PostgreSQL and Redis service containers.
+
+## What I learned
+
+{/* TODO: rewrite in your own words */}
+The model is the smallest part of a model deployment. Auth, versioning, caching and tests are what make it something other people can use.

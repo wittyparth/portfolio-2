@@ -1,0 +1,54 @@
+---
+name: NL2SQL
+tagline: A multi-tenant SaaS that turns plain-English questions into SQL, with human approval before anything runs on the customer's database.
+year: 2026
+status: shipped
+stack: [FastAPI, PostgreSQL, Qdrant, Redis, React, TypeScript, Docker, sqlglot]
+repo: https://github.com/wittyparth/nl2sql
+role: Solo
+---
+
+## The problem
+
+Asking a database a question in English is easy to demo and hard to trust. The model invents columns, guesses what a `status` value looks like, and a single bad statement against a customer's production database is not something you can undo.
+
+## The approach
+
+Every question goes through a five-stage pipeline, and the last stage is a gate rather than an executor. Nothing reaches the customer's database until a person approves the SQL.
+
+1. **Classify:** an intent check and safety guard decide whether the question is safe, needs a clarifying question, or is ready to generate.
+2. **Retrieve:** parallel vector search over four tenant-scoped Qdrant collections: schema docs, glossary terms, past query pairs and uploaded business documents.
+3. **Select:** a fast LLM call prunes the schema to the tables and columns the question needs.
+4. **Generate:** a separate generation-tier model writes the SQL, and a static validator feeds errors back into up to three retries.
+5. **Execute:** the SQL is risk-tiered, shown for approval, and only then run in a read-only transaction.
+
+Schema introspection also samples low-cardinality values, so the generator knows a `status` column holds `'SUCCEEDED'` and `'REFUNDED'` rather than just "text".
+
+## Architecture
+
+A FastAPI backend serves a React and Vite frontend. Each tenant's own database is reached through a per-tenant asyncpg pool, kept separate from the platform's own Postgres, which holds workspaces, members, billing, audit logs and chat sessions and uses row-level security policies. Qdrant holds the embeddings, Redis holds session context and rate limits, and an ARQ worker handles embeddings, webhooks, notifications and scheduled jobs such as nightly schema diffs.
+
+Generation is streamed: `POST /v1/query/generate/stream` returns server-sent events for each stage, so the UI shows intent, schema, SQL and review steps instead of a spinner. The model tiers are configured separately, and both accept any OpenAI-compatible endpoint with an optional fallback provider.
+
+<Architecture />
+
+## Making generated SQL safe to run
+
+Validation is five deterministic steps, none of which call an LLM: a keyword blocklist, a sqlglot parse, a single-statement check, a check that the statement is a `SELECT` (or a `WITH` ending in one), and a ban on `UNION`. Failures are written back into the next prompt, and the temperature rises on each retry.
+
+```python title="app/ai/stage4_generator.py"
+temperature = (
+    settings.LLM_TEMPERATURE_DEFAULT
+    if attempt == 0
+    else settings.LLM_TEMPERATURE_RETRY_1
+    if attempt == 1
+    else settings.LLM_TEMPERATURE_RETRY_2
+)
+```
+
+Even SQL that passes is run inside `BEGIN READ ONLY` with a statement timeout and a `ROLLBACK` in a `finally` block, and a row limit is injected before execution.
+
+## What I learned
+
+{/* TODO: rewrite in your own words */}
+The model is the least reliable part, so most of the code is about containing it: validating its output, grounding it in real schema, and keeping a person in the loop before anything executes.

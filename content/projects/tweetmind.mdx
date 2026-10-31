@@ -1,0 +1,55 @@
+---
+name: TweetMind
+tagline: A Chrome extension that drafts tweets, replies and quote tweets on X in your own voice, using your own LLM API key.
+year: 2026
+status: shipped
+stack: [React, TypeScript, Vite, FastAPI, Supabase, Redis, Python, Tailwind CSS]
+repo: https://github.com/wittyparth/TweetMind
+---
+
+## The problem
+
+Generic AI tweet writers sound like generic AI. They also live in a separate tab, so writing a reply means copying the tweet out, pasting it into a chat, and copying the answer back.
+
+## The approach
+
+TweetMind works inside X. A content script puts actions on the compose box and on each tweet, and a side panel handles the rest: generating tweets, replies and quote tweets, three variants at a time.
+
+- **A voice profile.** You point it at a profile and it reads the tweets (the extension's service worker opens a tab and scrapes them), then the backend analyzes them into a profile covering writing structure, vocabulary and persona. Generation uses that profile and a blocklist of phrases to avoid.
+- **Structured prompts, not free text.** The extension sends the raw idea plus parameters such as tone, hook style, content type, engagement goal and emotion. The backend builds the full prompt from those, so the model gets one set of instructions instead of nested ones.
+- **Bring your own key.** You pick a provider (OpenAI, Anthropic, Gemini, Groq or OpenRouter) and store your key once. The key is encrypted on the server and never sent back to the browser, only its last four characters.
+
+The extension signs in through Supabase Auth. History, personas and the voice profile are stored per user in Supabase.
+
+## Architecture
+
+The extension has three parts: a Manifest V3 service worker, a content script on x.com and twitter.com, and the React side panel. The panel and content script talk to a FastAPI backend with a Supabase access token. The backend verifies that token against Supabase's JWKS, applies per-user and per-IP rate limits, then runs generation or profile analysis and calls the user's chosen provider with their decrypted key.
+
+Redis holds the rate-limit counters and the daily usage totals, with in-memory fallbacks if it is unreachable. Supabase holds the persistent data: encrypted keys, voice profiles, generation history and personas. The backend talks to Supabase over its REST API with a service-role key.
+
+<Architecture />
+
+## Making the model's output dependable
+
+Every generation has to come back as exactly three variants under the character limit, as JSON. Models miss that often enough to matter, so the service parses and validates each response, and on failure makes one repair call that shows the model its own bad output and what was wrong with it:
+
+```python title="backend/src/tweetmind_backend/services/generation_service.py"
+repair_prompt = (
+    f"Your previous output was invalid — it had {parsed_count} variants "
+    f"instead of exactly 3, or was not valid JSON.\n\n"
+    f"Your output was:\n{raw_text[:1000]}\n\n"
+    "Fix this: return ONLY valid JSON with exactly 3 unique tweet variants.\n"
+    f'Format: {{"variants":[{{"text":"...","angle":"..."}},{{"text":"...","angle":"..."}},{{"text":"...","angle":"..."}}]}}\n'
+    f"Each text must be under {limit} characters. Keep any valid existing variants and add the missing ones."
+)
+```
+
+The repair call runs at a lower temperature than the first attempt. Variants then pass through a blocklist check before they are returned. Profile analysis uses the same idea, with three separate extraction passes (structure, vocabulary, persona) that each retry once and merge into one profile, so a failed pass degrades the profile instead of failing the request.
+
+## What I learned
+
+{/* TODO: rewrite in your own words */}
+Most of the work in an LLM feature is handling the output when it is wrong, not writing the prompt. I also found out how much a browser extension limits you: you cannot hold a secret in it, which is why the keys live on a server.
+
+{/* TODO: confirm the status. The repo has a release checklist but I found no published extension or live backend. */}
+{/* TODO: the repo root also has an older in-memory backend (backend/main.py, routers/, services/) beside the real one in backend/src/tweetmind_backend. Confirm it is dead code. */}

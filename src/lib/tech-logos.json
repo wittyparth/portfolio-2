@@ -1,0 +1,169 @@
+{
+  "python": {
+    "src": "/tech/python.svg"
+  },
+  "langchain": {
+    "src": "/tech/langchain.svg"
+  },
+  "openaiapi": {
+    "src": "/tech/openaiapi.svg",
+    "ink": true
+  },
+  "gemini": {
+    "src": "/tech/gemini.svg"
+  },
+  "claude": {
+    "src": "/tech/claude.svg"
+  },
+  "chromadb": {
+    "src": "/tech/chromadb.svg"
+  },
+  "qdrant": {
+    "src": "/tech/qdrant.svg"
+  },
+  "scikitlearn": {
+    "src": "/tech/scikitlearn.svg"
+  },
+  "mcp": {
+    "src": "/tech/mcp.svg",
+    "ink": true
+  },
+  "fastapi": {
+    "src": "/tech/fastapi.svg"
+  },
+  "pydantic": {
+    "src": "/tech/pydantic.svg"
+  },
+  "nodejs": {
+    "src": "/tech/nodejs.svg"
+  },
+  "express": {
+    "src": "/tech/express.svg",
+    "ink": true
+  },
+  "django": {
+    "src": "/tech/django.svg"
+  },
+  "rabbitmq": {
+    "src": "/tech/rabbitmq.svg"
+  },
+  "graphql": {
+    "src": "/tech/graphql.svg"
+  },
+  "postgresql": {
+    "src": "/tech/postgresql.svg"
+  },
+  "redis": {
+    "src": "/tech/redis.svg"
+  },
+  "mongodb": {
+    "src": "/tech/mongodb.svg"
+  },
+  "elasticsearch": {
+    "src": "/tech/elasticsearch.svg"
+  },
+  "sqlite": {
+    "src": "/tech/sqlite.svg"
+  },
+  "prisma": {
+    "src": "/tech/prisma.svg",
+    "ink": true
+  },
+  "supabase": {
+    "src": "/tech/supabase.svg"
+  },
+  "typescript": {
+    "src": "/tech/typescript.svg"
+  },
+  "react": {
+    "src": "/tech/react.svg"
+  },
+  "nextjs": {
+    "src": "/tech/nextjs.svg",
+    "ink": true
+  },
+  "tailwindcss": {
+    "src": "/tech/tailwindcss.svg"
+  },
+  "javascript": {
+    "src": "/tech/javascript.svg"
+  },
+  "reactnative": {
+    "src": "/tech/reactnative.svg"
+  },
+  "aws": {
+    "src": "/tech/aws.svg",
+    "ink": true
+  },
+  "docker": {
+    "src": "/tech/docker.svg"
+  },
+  "githubactions": {
+    "src": "/tech/githubactions.svg"
+  },
+  "cloudformation": {
+    "src": "/tech/cloudformation.svg"
+  },
+  "nginx": {
+    "src": "/tech/nginx.svg"
+  },
+  "vercel": {
+    "src": "/tech/vercel.svg",
+    "ink": true
+  },
+  "git": {
+    "src": "/tech/git.svg"
+  },
+  "pytest": {
+    "src": "/tech/pytest.svg"
+  },
+  "c++": {
+    "src": "/tech/cpp.svg"
+  },
+  "bash": {
+    "src": "/tech/bash.svg",
+    "ink": true
+  },
+  "postman": {
+    "src": "/tech/postman.svg"
+  },
+  "cursor": {
+    "src": "/tech/cursor.svg",
+    "ink": true
+  },
+  "linux": {
+    "src": "/tech/linux.svg"
+  },
+  "awscdk": {
+    "src": "/tech/awscdk.svg",
+    "ink": true
+  },
+  "expo": {
+    "src": "/tech/expo.svg",
+    "ink": true
+  },
+  "turborepo": {
+    "src": "/tech/turborepo.svg"
+  },
+  "vite": {
+    "src": "/tech/vite.svg"
+  },
+  "livekit": {
+    "src": "/tech/livekit.svg",
+    "ink": true
+  },
+  "vscode": {
+    "src": "/tech/vscode.svg"
+  },
+  "jupyter": {
+    "src": "/tech/jupyter.svg"
+  },
+  "notion": {
+    "src": "/tech/notion.svg",
+    "ink": true
+  },
+  "zsh": {
+    "src": "/tech/zsh.svg",
+    "ink": true
+  }
+}

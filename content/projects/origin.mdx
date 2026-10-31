@@ -1,0 +1,53 @@
+---
+# The repo is private, so there is no public source link. TODO: add repo: back if you make it public.
+name: Origin
+tagline: A backend take-home that plans wall-painting robot paths asynchronously over RabbitMQ and logs everything to an ELK stack.
+year: 2026
+status: shipped
+stack: [FastAPI, RabbitMQ, PostgreSQL, Redis, SQLAlchemy, Shapely, Docker, Elasticsearch]
+role: Solo
+---
+
+## The problem
+
+This was a backend assignment for Origin: given a wall with rectangular or polygonal obstacles (windows, doors), plan a path that lets a wall-finishing robot cover the free surface, and expose it all through an API. Planning can be slow, so the API should not block on it, and someone should be able to see what the system is doing while it runs.
+
+## The approach
+
+I treated it as a small event-driven system rather than a single endpoint. Creating a task returns `202 Accepted` straight away, a separate worker process does the geometry, and a simulated robot receives the result and reports telemetry back.
+
+- **CRUD for walls, obstacles, tasks and trajectories** (about 15 endpoints), validated with Pydantic and stored in PostgreSQL on Neon through SQLAlchemy and Alembic migrations.
+- **Three trajectories per task** (a high-precision, a standard and a fast-draft sweep, using different tool radii), so a caller can compare coverage time against detail.
+- **Task status and trajectory reads go through Redis first**, with the database as fallback and a one-hour TTL.
+- **Every request and worker step is logged as JSON** to Logstash, Elasticsearch and Kibana, including per-request latency and per-scenario coverage figures.
+- A Locust and k6 stress-testing suite lives alongside the API.
+
+## Architecture
+
+The FastAPI app writes a `PENDING` task to PostgreSQL, caches its state in Redis and publishes a message to a durable RabbitMQ queue. A cloud worker consumes one message at a time, marks the task `PROCESSING`, runs the planner for each scenario, saves the trajectories and marks the task `COMPLETED`, then publishes the standard-sweep waypoints to the robot's own queue.
+
+A robot simulator listens on that queue, walks the waypoints and emits progress telemetry. The API, the worker and the simulator all log through the same Logstash handler, so one Kibana dashboard shows the whole flow.
+
+<Architecture />
+
+## The planner
+
+The planner (`planning/coverage_planner.py`) is built on Shapely. It subtracts the union of obstacle polygons from the wall rectangle, cuts what is left into 2m blocks, sweeps each block with vertical zigzag lines spaced one tool diameter apart, and then orders the blocks with a small genetic algorithm that minimises the transit distance between the end of one block and the start of the next.
+
+```python title="backend/planning/coverage_planner.py"
+safe_block = block.intersection(self.free_space)
+# If the remaining safe block is larger than the tool size, keep it
+if not safe_block.is_empty and safe_block.area > (self.tool_radius**2):
+    blocks.append(safe_block)
+```
+
+<Callout type="warn">
+  This is a simplified take on the boustrophedon-plus-A* approach the README describes. The "A*" transit step detours through a single midpoint when the straight line hits an obstacle, and the reported coverage efficiency is a fixed constant rather than a measured value. It was good enough to show the system working end to end, not production path planning.
+</Callout>
+
+{/* TODO: confirm how to describe the planner. README claims Boustrophedon Cellular Decomposition and A* pathfinding, but the code uses grid blocks and a midpoint detour, and coverage_efficiency is hardcoded to 98.5. */}
+
+## What I learned
+
+{/* TODO: rewrite in your own words */}
+Putting a queue between the API and the slow work changed the design more than any algorithm did: statuses, retries, rejecting poison messages and observability all had to be thought through. I also learned to be careful about which claims a README makes versus what the code actually measures.

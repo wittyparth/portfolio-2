@@ -1,0 +1,69 @@
+---
+name: GhostWriterAI
+tagline: Five LangGraph agents that turn a raw idea into a LinkedIn post, used by 50+ people in production.
+year: 2026
+status: shipped
+stack: [FastAPI, LangGraph, Gemini, PostgreSQL, SQLAlchemy, React, Docker, pytest]
+repo: https://github.com/wittyparth/GhostWriterAI
+live: https://www.ghostwriterai.site/
+role: Solo, self-funded
+featured: true
+order: 1
+---
+
+## The problem
+
+Writing a good LinkedIn post takes more steps than it looks: checking the idea is worth posting, picking a format, writing a hook, designing a carousel. Generic AI writers skip most of them, and it shows.
+
+## The approach
+
+GhostWriterAI gives each step its own agent. Five agents (validator, strategist, writer, visual designer and optimizer) pass a typed state to one another on the Gemini API, and the app streams each agent's progress to the browser as it works.
+
+- **39+ REST endpoints** behind the web app: auth with email verification, brand profiles, post generation, history and analytics.
+- **50+ active users and 200+ generations** since launch, self-funded.
+- Each user has a brand profile (voice, audience, content pillars, sample posts) that is fed to every agent.
+- Structured prompting with Pydantic output schemas cut token use by **40%**.
+
+{/* TODO: confirm the 40% figure and which part came from RAG. The ChromaDB retriever exists in backend/src/rag, but I could not find it called from the agents or routes, only from scripts/seed_knowledge_base.py. */}
+
+## Architecture
+
+A React and Vite single-page app calls a FastAPI backend. Generation is a two-phase flow: the validator and strategist run first and stop with clarifying questions, then after the user answers, the writer, optional visual designer and optimizer run. Each phase starts as an asyncio task inside the API process, and its events go into a queue that the SSE response reads from.
+
+PostgreSQL (async SQLAlchemy, Alembic migrations) stores users, brand profiles, posts and a full per-agent history, including every event the stream emitted. Verification emails go out over SMTP through Brevo.
+
+<Architecture />
+
+## The pipeline
+
+The graph is small on purpose. The validator can reject an idea and end the run. The strategist always pauses the graph so a human can answer questions. After writing, only carousels go through the visual agent, and the optimizer can send the draft back to the writer, at most twice.
+
+```python title="backend/src/orchestration/graph.py"
+def route_after_optimizer(state: AgentState) -> str:
+    """Route based on optimizer decision."""
+    decision = state.get("optimizer_output", {}).get("decision", "APPROVE")
+    revision = state.get("revision_count", 0)
+    max_rev = state.get("max_revisions", 2)
+
+    if decision == "REVISE" and revision < max_rev:
+        state["revision_count"] = revision + 1
+        return "write"
+    return "finalize"
+```
+
+Capping revisions keeps the loop from burning tokens chasing a perfect score. Every agent also sits behind a shared base class that times the call, retries on failure with a growing delay, and returns a structured result.
+
+<Callout type="note">
+  The streamed path calls the agent nodes one by one so it can emit an event around each, while the compiled LangGraph is used for the non-streaming endpoints.
+</Callout>
+
+## Shipping it
+
+Backend and frontend deploy separately, with a Dockerfile for the API and GitHub Actions workflows for tests and deploys. Alembic migrations track schema changes, and pytest covers agents, the database layer and an end-to-end generation flow.
+
+{/* TODO: confirm production hosting (Render and Vercel per the resume) and that Nginx and Celery are used in the deployed setup. Neither appears anywhere in this repo, and the code runs agents as asyncio tasks. */}
+
+## What I learned
+
+{/* TODO: rewrite in your own words */}
+Splitting one big prompt into narrow agents made each step easier to test and tune, but it also made state handling and streaming the hard part. Showing users what each agent is doing turned out to matter as much as the output.

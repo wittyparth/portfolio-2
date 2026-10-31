@@ -1,0 +1,58 @@
+---
+name: FlexAI
+tagline: A fitness app for logging workouts and building routines, with an AI coach and a workout generator grounded in a real exercise library.
+year: 2026
+status: shipped
+stack: [React Native, Expo, TypeScript, Express, Prisma, PostgreSQL, Gemini, Redis]
+repo: https://github.com/wittyparth/FlexAI
+links: [{ label: "Landing page repo", href: "https://github.com/wittyparth/FlexAI-Landing-Page" }]
+---
+
+## The problem
+
+Most workout trackers are a logbook and nothing else. The AI features that do exist tend to be a chat box that invents exercises, so the plan it gives you can't be loaded into the app and run as a workout.
+
+## The approach
+
+FlexAI is a mobile app with an Express backend behind it. It covers the usual tracker surface: onboarding, routines, an active-workout flow with set logging and a rest timer, body measurements, stats, a social feed, challenges and XP. The AI part is two features on top of that data.
+
+- **Workout generator.** You give it a goal, duration, equipment and experience level. It returns a warm-up, main block and cool-down made only of exercises that exist in the database.
+- **AI coach.** A chat that knows your profile, goal and recent workouts, and keeps its conversation history in Postgres.
+
+The exercise library came from a scraper I wrote in `Scraping/`, which pulled about 1,200 exercises (names, instructions, muscles, equipment) into JSON. That file seeds the database.
+
+There is also a separate single-page landing page for the product, in its own small repo. It is one static `index.html` and does not talk to the backend.
+
+## Architecture
+
+The Expo app calls a versioned REST API under `/api/v1` through per-domain Axios modules, with React Query for server state and Zustand for session and workout state. The Express layer applies Helmet, CORS, rate limiting and Zod validation, then JWT auth, before routing to controllers and services. Prisma talks to PostgreSQL. Google sign-in goes through `google-auth-library`, push notifications through Firebase Admin, and the leaderboard code uses Redis sorted sets.
+
+Everything runs as one API process. BullMQ is in the dependencies, but I found no queues or workers in the code, so there is no background job layer yet.
+
+<Architecture />
+
+## Grounding the generator in the database
+
+The generator is retrieval first, generation second. Each exercise has a 768-dimension pgvector embedding, produced once by a seed script using `gemini-embedding-001`. At request time the service embeds a short description of what the user asked for, pulls the 30 nearest exercises by cosine distance, and puts only those in the prompt with their IDs. Gemini is told to pick from that list and return JSON.
+
+The model can still ignore the instruction, so the result is filtered before it goes back to the app:
+
+```ts title="fitness-backend/src/services/ai/WorkoutGenerationService.ts"
+const validIds = new Set(relevantExercises.map((e: any) => e.id));
+const validateSection = (section: any[]) => {
+    return section.filter(item => validIds.has(item.exerciseId));
+};
+
+workoutData.warmup = validateSection(workoutData.warmup || []);
+workoutData.main = validateSection(workoutData.main || []);
+workoutData.cooldown = validateSection(workoutData.cooldown || []);
+```
+
+Anything the model makes up is dropped, and what remains maps to real rows the app can render with their GIFs and muscle data. The embedding model returns more than 768 dimensions, so the code truncates the vector to fit the column.
+
+{/* TODO: confirm how much of the generator is wired into the mobile screens, and whether the equipment filter should be re-enabled (it is currently commented out in the vector query). */}
+
+## What I learned
+
+{/* TODO: rewrite in your own words */}
+Retrieving the candidates first, then validating the model's output against them, was what made the AI feature usable. The other lesson was scope: a lot of screens and backend modules is easy to scaffold, and much harder to finish. I also left a few things half-wired, like the job queue, which I would clean up before calling it shipped.

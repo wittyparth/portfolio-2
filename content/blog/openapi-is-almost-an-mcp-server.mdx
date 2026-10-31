@@ -1,0 +1,61 @@
+---
+title: OpenAPI is almost an MCP server
+summary: An OpenAPI spec already has names, descriptions and schemas for every operation. The last mile to an MCP server is shorter than it looks, and more interesting.
+date: 2026-09-02
+type: tutorial
+tags: [mcp, apis]
+placeholder: true
+---
+
+{/* TODO: placeholder post. Replace with your own writing. */}
+
+Put an OpenAPI operation next to an MCP tool definition and they look like cousins.
+
+## The mapping
+
+```yaml title="openapi.yaml"
+paths:
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      summary: Fetch a single order by its id.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+```
+
+```json title="the MCP tool it becomes"
+{
+  "name": "get_order",
+  "description": "Fetch a single order by its id.",
+  "inputSchema": {
+    "type": "object",
+    "properties": { "id": { "type": "string" } },
+    "required": ["id"]
+  }
+}
+```
+
+The name comes from `operationId`, the description from `summary`, and the input schema from the parameters and the request body merged together.
+
+## The parts that aren't mechanical
+
+### Choosing what to expose
+
+A spec with three hundred operations is a terrible toolset. Models get worse at picking the right tool as the list grows, so the generator's real job is helping you choose.
+
+### Writing descriptions for models
+
+`summary: Get order` is enough for a developer reading docs. A model needs to know *when* to use the tool, not just what it does.
+
+<Callout>
+  The best descriptions answer "when should I call this instead of the tool next to it?"
+</Callout>
+
+![Reviewing the generated tools before deploying](/projects/mcpforge/2-reviewing-generated-mcp-tools.png)
+
+## Where this leaves things
+
+Generating the server is the easy part. Curating it is where the work is, and where a tool can actually help.

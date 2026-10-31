@@ -1,0 +1,54 @@
+{
+  "title": "From labelled issue to pull request",
+  "lanes": [
+    { "id": "github", "label": "GitHub" },
+    { "id": "control", "label": "Control plane (Lambda)" },
+    { "id": "worker", "label": "Fargate worker" },
+    { "id": "state", "label": "AWS state" },
+    { "id": "external", "label": "External" }
+  ],
+  "nodes": [
+    { "id": "issue", "label": "GitHub issue", "lane": "github", "row": 0, "kind": "client", "note": "Trigger is the label '@agent fix this' on an issue, or an issue comment starting '@agent fix'. The GitHub App delivers the webhook." },
+    { "id": "github-api", "label": "GitHub REST API", "lane": "github", "row": 5, "kind": "external", "note": "Where the worker pushes the run branch, opens the PR, adds the needs-review label or comments on the issue." },
+    { "id": "webhook", "label": "Webhook Lambda", "lane": "control", "row": 0, "kind": "gateway", "tech": "AWS", "note": "app/src/webhook/handler.ts behind API Gateway. Checks the X-Hub-Signature-256 HMAC, detects the trigger, enqueues a work item." },
+    { "id": "queue", "label": "SQS work queue", "lane": "control", "row": 1, "kind": "queue", "tech": "AWS", "note": "5-minute visibility timeout. A message that fails 5 receives moves to a 14-day dead-letter queue." },
+    { "id": "dispatcher", "label": "Dispatcher Lambda", "lane": "control", "row": 2, "kind": "service", "tech": "AWS", "note": "dispatcher/handler.ts. Claims the run, checks the invite allowlist, reserves a budget slot, calls ECS RunTask, releases the slot if launch fails." },
+    { "id": "dlq", "label": "DLQ consumer Lambda", "lane": "control", "row": 4, "kind": "service", "tech": "AWS", "note": "dlq/handler.ts. Logs the terminal failure and comments on the issue so the reporter is not left waiting. A CloudWatch alarm fires on DLQ messages." },
+    { "id": "boot", "label": "Worker bootstrap", "lane": "worker", "row": 2, "kind": "worker", "tech": "Docker", "note": "__main__.py. Loads run config, mints an installation token, clones over an HTTP header (no token in the URL), makes the run branch, picks an adapter." },
+    { "id": "agent", "label": "Agent loop", "lane": "worker", "row": 3, "kind": "worker", "tech": "Python", "note": "agent/loop.py. Tools: ripgrep, repo_map, read_file, edit_file, apply_patch, run_tests, finish. LimitTracker caps turns, time and cost." },
+    { "id": "adapters", "label": "Language adapters", "lane": "worker", "row": 4, "kind": "service", "tech": "Python", "note": "Python adapter (uv or pip, pytest, coverage.py) and Node adapter (pnpm, yarn or npm, c8). Unsupported repos fail fast." },
+    { "id": "verify", "label": "Verify and post", "lane": "worker", "row": 5, "kind": "worker", "tech": "Python", "note": "verify.py and post_result.py. Full suite plus coverage against the base commit, then PR, needs-review PR or comment. Bodies are secret-scrubbed." },
+    { "id": "dynamo", "label": "DynamoDB", "lane": "state", "row": 2, "kind": "database", "tech": "AWS", "note": "Three tables: runs (conditional PutItem on a hash of the delivery id), per-repo daily budgets with a TTL, and invited installations." },
+    { "id": "ssm", "label": "SSM Parameter Store", "lane": "state", "row": 3, "kind": "storage", "tech": "AWS", "note": "GitHub App id and private key, the webhook HMAC secret, and LLM provider keys. Plain String parameters, set after deploy." },
+    { "id": "llm", "label": "LLM provider", "lane": "external", "row": 3, "kind": "llm", "note": "worker/llm/ has Anthropic, OpenRouter and OpenAI-compatible providers behind one Provider interface, chosen by LLM_PROVIDER." },
+    { "id": "langfuse", "label": "Langfuse", "lane": "external", "row": 4, "kind": "external", "note": "observability.py posts one trace per run and a span per turn to the Langfuse ingestion API over httpx, and never fails the run." }
+  ],
+  "edges": [
+    { "from": "issue", "to": "webhook", "label": "Signed webhook", "style": "async" },
+    { "from": "webhook", "to": "ssm", "label": "Webhook secret", "style": "sync" },
+    { "from": "webhook", "to": "queue", "label": "SQS message", "style": "async" },
+    { "from": "queue", "to": "dispatcher", "label": "SQS trigger", "style": "async" },
+    { "from": "dispatcher", "to": "dynamo", "label": "Claim, allowlist, budget", "style": "sync" },
+    { "from": "dispatcher", "to": "boot", "label": "ECS RunTask", "style": "async" },
+    { "from": "queue", "to": "dlq", "label": "Dead-letter after 5 tries", "style": "async" },
+    { "from": "dlq", "to": "github-api", "label": "Issue comment", "style": "sync" },
+    { "from": "boot", "to": "ssm", "label": "GitHub App key", "style": "sync" },
+    { "from": "boot", "to": "github-api", "label": "Install token, git clone", "style": "sync" },
+    { "from": "boot", "to": "agent", "label": "Repo and adapter", "style": "sync" },
+    { "from": "agent", "to": "llm", "label": "LLM call with tools", "style": "sync" },
+    { "from": "agent", "to": "adapters", "label": "run_tests tool", "style": "sync" },
+    { "from": "agent", "to": "langfuse", "label": "Trace spans", "style": "async" },
+    { "from": "agent", "to": "verify", "label": "Committed patch", "style": "sync" },
+    { "from": "verify", "to": "adapters", "label": "Full suite and coverage", "style": "sync" },
+    { "from": "verify", "to": "github-api", "label": "Push, PR, label or comment", "style": "sync" }
+  ],
+  "flow": [
+    "A labelled issue or an '@agent fix' comment triggers a webhook; the Lambda verifies the HMAC signature and enqueues a work item on SQS.",
+    "The dispatcher claims the run with a conditional write on the delivery id, checks the invite allowlist and reserves a per-repo daily slot.",
+    "It calls ECS RunTask with metadata-only overrides; the worker reads the GitHub App key from SSM and mints its own installation token.",
+    "The worker clones the repo, creates a run-scoped branch and picks the Python or Node adapter.",
+    "The agent loop searches, edits and runs tests through a path-guarded toolset until it calls finish or hits the turn, time or cost cap.",
+    "The verification gate runs the full suite and coverage in the sandbox, then opens a PR, opens it with a needs-review label, or only comments.",
+    "Secondary path: if the dispatcher keeps failing, SQS moves the message to the dead-letter queue, where a Lambda logs it and comments on the issue."
+  ]
+}

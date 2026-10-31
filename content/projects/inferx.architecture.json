@@ -1,0 +1,59 @@
+{
+  "title": "How a prediction request flows",
+  "lanes": [
+    { "id": "client", "label": "Clients" },
+    { "id": "gateway", "label": "Edge" },
+    { "id": "services", "label": "Service layer" },
+    { "id": "data", "label": "Data" },
+    { "id": "external", "label": "Outside" }
+  ],
+  "nodes": [
+    { "id": "dashboard", "label": "Next.js dashboard", "lane": "client", "row": 0, "kind": "client", "tech": "Next.js", "note": "Frontend/ app: login, model upload, API keys, sharing, webhooks and analytics pages. Talks to the API through lib/api-client.ts." },
+    { "id": "api-consumers", "label": "API consumers", "lane": "client", "row": 2, "kind": "client", "note": "Any app calling POST /predictions/{model_id} with an X-API-Key header instead of a browser session." },
+    { "id": "middleware", "label": "Middleware stack", "lane": "gateway", "row": 0, "kind": "gateway", "tech": "FastAPI", "note": "core/middleware.py plus CORS and session middleware: error tracking, slow-request timing, request logging, rate-limit headers." },
+    { "id": "auth", "label": "Auth dependencies", "lane": "gateway", "row": 1, "kind": "service", "tech": "FastAPI", "note": "api/dependencies.py: get_current_user accepts a JWT bearer token or an X-API-Key (SHA-256 hash lookup), plus admin and per-model share checks." },
+    { "id": "routers", "label": "Routers (v1)", "lane": "services", "row": 0, "kind": "service", "tech": "FastAPI", "note": "api/v1: auth, models, predictions, api_keys, model_shares, webhooks, users, health. About 37 route handlers, validated with Pydantic." },
+    { "id": "rate-limiter", "label": "Rate limiter", "lane": "services", "row": 1, "kind": "service", "tech": "Redis", "note": "core/rate_limiter.py: a Depends(rate_limit(config)) per route, using a Redis sorted-set sliding window. Fails open if Redis is down." },
+    { "id": "prediction-cache", "label": "Prediction cache", "lane": "services", "row": 2, "kind": "service", "tech": "Redis", "note": "core/caching.py: keys pred:{model}:{version}:{sha256 of input}, 1 hour TTL, hit and miss stats, per-model invalidation." },
+    { "id": "model-loader", "label": "Model loader", "lane": "services", "row": 3, "kind": "service", "tech": "Python", "note": "core/model_loader.py: loads joblib or pickle models and keeps up to 5 in an in-process cache so repeat misses skip the disk or S3 read." },
+    { "id": "storage-service", "label": "Storage service", "lane": "services", "row": 4, "kind": "service", "tech": "AWS", "note": "core/storage.py: one interface for S3 and local disk. Used by the upload route to save models and by the loader to read them." },
+    { "id": "background", "label": "Background tasks", "lane": "services", "row": 5, "kind": "worker", "tech": "FastAPI", "note": "FastAPI BackgroundTasks, run after the response: cache the result, write the prediction log, trigger webhooks." },
+    { "id": "webhook-service", "label": "Webhook dispatcher", "lane": "services", "row": 6, "kind": "service", "tech": "Python", "note": "core/webhook_service.py: signs the payload with HMAC-SHA256, POSTs it with httpx and retries on 5xx or network errors." },
+    { "id": "redis", "label": "Redis", "lane": "data", "row": 0, "kind": "cache", "tech": "Redis", "note": "Holds pred:* cached predictions and rate_limit:* sorted sets. Both degrade gracefully when Redis is not configured." },
+    { "id": "postgres", "label": "PostgreSQL", "lane": "data", "row": 1, "kind": "database", "tech": "PostgreSQL", "note": "SQLAlchemy models for users, models and versions, API keys, model shares, webhooks and predictions. Schema managed with Alembic." },
+    { "id": "s3", "label": "S3 or local disk", "lane": "data", "row": 2, "kind": "storage", "tech": "AWS", "note": "Serialized model files. S3 via boto3 when configured, otherwise the UPLOAD_DIR folder." },
+    { "id": "webhook-target", "label": "Customer webhook URL", "lane": "external", "row": 0, "kind": "external", "note": "Receives events with X-Webhook-Signature, X-Webhook-Timestamp and X-Webhook-Id headers." },
+    { "id": "oauth", "label": "Google and GitHub OAuth", "lane": "external", "row": 1, "kind": "external", "note": "services/oauth.py registers both providers with authlib for the /auth/oauth/{provider} login flow." }
+  ],
+  "edges": [
+    { "from": "dashboard", "to": "middleware", "label": "REST + JWT", "style": "sync" },
+    { "from": "api-consumers", "to": "middleware", "label": "REST + X-API-Key", "style": "sync" },
+    { "from": "middleware", "to": "auth", "label": "resolve caller", "style": "sync" },
+    { "from": "auth", "to": "postgres", "label": "user, key hash lookup", "style": "sync" },
+    { "from": "auth", "to": "oauth", "label": "OAuth 2.0 login", "style": "sync" },
+    { "from": "middleware", "to": "routers", "label": "authenticated request", "style": "sync" },
+    { "from": "routers", "to": "rate-limiter", "label": "check route limit", "style": "sync" },
+    { "from": "rate-limiter", "to": "redis", "label": "sliding window", "style": "sync" },
+    { "from": "routers", "to": "prediction-cache", "label": "cache lookup", "style": "sync" },
+    { "from": "prediction-cache", "to": "redis", "label": "GET / SETEX pred:*", "style": "sync" },
+    { "from": "routers", "to": "model-loader", "label": "load on cache miss", "style": "sync" },
+    { "from": "model-loader", "to": "storage-service", "label": "read model file", "style": "sync" },
+    { "from": "routers", "to": "storage-service", "label": "save uploaded model", "style": "sync" },
+    { "from": "storage-service", "to": "s3", "label": "S3 or file I/O", "style": "sync" },
+    { "from": "routers", "to": "postgres", "label": "SQL", "style": "sync" },
+    { "from": "routers", "to": "background", "label": "queued after response", "style": "async" },
+    { "from": "background", "to": "prediction-cache", "label": "store result", "style": "async" },
+    { "from": "background", "to": "postgres", "label": "prediction log", "style": "async" },
+    { "from": "background", "to": "webhook-service", "label": "trigger_webhooks", "style": "async" },
+    { "from": "webhook-service", "to": "webhook-target", "label": "signed webhook", "style": "async" }
+  ],
+  "flow": [
+    "A client POSTs input to /predictions/{model_id}, either from the dashboard with a JWT or from an app with an X-API-Key.",
+    "The middleware stack logs and times the request, then get_current_user resolves the caller from the token or the hashed key in PostgreSQL.",
+    "The route's rate limit is checked in Redis with a sliding window; over the limit returns 429.",
+    "The model record is loaded from PostgreSQL, the input is hashed, and Redis is checked for a cached prediction. A hit returns immediately.",
+    "On a miss the model loader reads the file through the storage service (or its in-memory cache), runs predict and returns the result.",
+    "After the response, background tasks write the result to Redis with a one hour TTL and log the prediction to PostgreSQL.",
+    "Secondary path: the same tasks call trigger_webhooks, which POSTs an HMAC-SHA256 signed event to each registered URL and retries on failure."
+  ]
+}

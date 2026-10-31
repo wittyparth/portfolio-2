@@ -1,0 +1,51 @@
+---
+name: Issue to PR
+tagline: A GitHub App that picks up a labelled issue, has an LLM agent fix it in an AWS sandbox, and opens a PR only if the tests pass.
+year: 2026
+status: shipped
+stack: [AWS, TypeScript, Python, AWS CDK, Docker, GitHub Actions, pytest]
+repo: https://github.com/wittyparth/issue-to-pr
+role: Solo
+---
+
+## The problem
+
+Coding agents are easy to start and hard to leave running. Left alone they can loop forever, spend more than the issue is worth, push to the wrong branch, or declare success on code that fails its own tests.
+
+## The approach
+
+Labelling an issue `@agent fix this` (or commenting `@agent fix`) starts one ephemeral run. The design rule is that the agent's own claim of success is never trusted: only a green full test suite inside the sandbox can open a PR.
+
+- **Hard caps:** the agent loop stops at 30 turns, 30 minutes or $20 of provider-reported cost by default. If a provider does not report a cost, the cost stays unknown rather than being estimated.
+- **Verification gate:** tests red means a comment on the issue and no PR. Tests green but coverage dropped by more than two points, or coverage could not be measured, opens the PR with a `needs-review` label.
+- **Write guard:** the agent's file tools reject paths outside the repo and anything under `.github/workflows/`, compared case-insensitively.
+- **Provider-agnostic:** the worker talks to an LLM interface with Anthropic, OpenRouter and OpenAI-compatible implementations.
+
+{/* TODO: confirm whether this has been deployed and run against real issues; the repo README says all milestones are implemented but I saw no live deployment */}
+
+## Architecture
+
+The control plane is TypeScript on AWS: an API Gateway HTTP API in front of a webhook Lambda, an SQS queue, and a dispatcher Lambda that launches the worker. The worker is a Python container run as a one-off Fargate task, so nothing is running when there are no issues. State lives in three DynamoDB tables for runs, budgets and the invited installations, and everything is defined in AWS CDK.
+
+The worker mints its own short-lived GitHub installation token on start and reads the GitHub App key from SSM Parameter Store, so no token is passed in the task environment. Traces go to Langfuse over its HTTP API. A dead-letter consumer comments on the issue when a message fails repeatedly.
+
+{/* TODO: the README says Secrets Manager but the CDK and worker use SSM Parameter Store; confirm which is current */}
+
+<Architecture />
+
+## Running each webhook exactly once
+
+GitHub can deliver the same webhook more than once, and a duplicate here means paying for a second agent run. The dispatcher derives a run id from the delivery id and claims it with a conditional write before doing anything else. It then checks the allowlist and reserves a slot in a per-repo, per-day budget, which is decremented again if the Fargate launch fails.
+
+```typescript title="app/src/lib/budget.ts"
+UpdateExpression:
+  "SET prs_used = if_not_exists(prs_used, :zero) + :one, expiresAt = :expiresAt",
+ConditionExpression: "attribute_not_exists(prs_used) OR prs_used < :ceiling",
+```
+
+The slot is released again if the Fargate launch fails. The budget module also has a post-run dollar reconcile function, though I did not find the worker calling it yet.
+
+## What I learned
+
+{/* TODO: rewrite in your own words */}
+Most of the design is about limits and failure modes rather than the agent itself: duplicate deliveries, runaway cost, and what the system does when the tests fail.

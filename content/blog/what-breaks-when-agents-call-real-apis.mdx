@@ -1,0 +1,69 @@
+---
+title: What breaks when agents call real APIs
+summary: Tool calling works beautifully against a mock. Against a real API, it fails in five boring, predictable ways. Here they are, and what I do about each.
+date: 2026-10-12
+type: essay
+tags: [agents, evals]
+pinned: true
+placeholder: true
+---
+
+{/* TODO: placeholder post. Replace with your own writing. */}
+
+Every agent demo calls a function called `get_weather`. It takes a city, returns a temperature, and never fails. Real APIs are not like that, and most agent bugs I've chased come from the gap between the two.
+
+## Failure one: the schema lies
+
+OpenAPI specs describe what an API *should* accept. The API itself accepts something slightly different: a field marked optional that's required in practice, an enum with one undocumented value, a date that wants a timezone.
+
+The model follows the schema perfectly and still gets a `400`.
+
+```python title="tools/validate.py"
+def check_against_reality(tool: Tool, samples: list[dict]) -> list[str]:
+    """Replay recorded real requests through the tool's schema and report mismatches."""
+    problems = []
+    for sample in samples:
+        errors = tool.input_schema.validate(sample["request"])
+        if errors and sample["status"] < 400:
+            problems.append(f"{tool.name}: schema rejects a request the API accepted: {errors[0]}")
+    return problems
+```
+
+The fix isn't a better prompt. It's testing the schema against recorded traffic before the model ever sees it.
+
+## Failure two: errors written for humans
+
+`{"error": "Something went wrong"}` is fine for a person who can retry later. An agent will retry immediately, identically, forever.
+
+<Callout type="tip">
+  Translate every error into three things the model can act on: what failed, whether retrying can help, and what to change if so.
+</Callout>
+
+## Failure three: pagination
+
+A model asked for "all open orders" calls `list_orders` once, gets fifty, and reports fifty. Nothing in the response says there were 1,200.
+
+I now return a `has_more` flag and a plain-English note in every paginated tool result, and the agent's prompt says what to do with it.
+
+## Failure four: side effects
+
+Reading is safe to retry. Writing is not. If a `create_refund` call times out, did the refund happen?
+
+| Operation | Safe to retry? | What the tool does |
+| --- | --- | --- |
+| `GET` | Yes | Retries with backoff |
+| `PUT`, `DELETE` | Usually | Retries once, then reports |
+| `POST` | No | Sends an idempotency key, never retries blind |
+
+## Failure five: the happy path is the only path you tested
+
+Evals built from demos test demos. The cases that matter are the ones above, so those are the ones I write first.
+
+### A small eval set that catches most of this
+
+- One request per tool that the schema allows but the API rejects.
+- One error per tool, checked for a sensible next step.
+- One paginated list longer than a single page.
+- One timeout on a write.
+
+Four cases per tool is not much. It catches most of what used to reach production.

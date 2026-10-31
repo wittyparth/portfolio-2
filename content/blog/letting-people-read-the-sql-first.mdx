@@ -1,0 +1,39 @@
+---
+title: Letting people read the SQL first
+summary: A text-to-SQL tool that shows its query before running it gets forgiven for mistakes. One that doesn't, doesn't.
+date: 2026-08-18
+type: build-log
+tags: [nl2sql, ux]
+placeholder: true
+---
+
+{/* TODO: placeholder post. Replace with your own writing. */}
+
+The first version of nl2sql ran the query as soon as it was generated. It was fast, and it was impressive right up until it was wrong.
+
+## Wrong answers look exactly like right ones
+
+A query that joins the wrong table still returns a tidy table of numbers. Nothing on the screen says "this is nonsense".
+
+## Show, then run
+
+The fix was a pause. Generate the SQL, show it with a short explanation, and wait.
+
+```sql title="explained, clause by clause"
+SELECT c.name, SUM(o.total) AS revenue  -- revenue per customer
+FROM orders o
+JOIN customers c ON c.id = o.customer_id -- match each order to its customer
+GROUP BY c.name
+ORDER BY revenue DESC                    -- biggest first
+LIMIT 5;                                 -- top five only
+```
+
+People who couldn't write SQL could still read it well enough to notice "wait, that's all-time, I asked about this quarter".
+
+<Callout type="warn">
+  None of this replaces a read-only database role. Showing the query is a usability feature, not a safety one.
+</Callout>
+
+## What changed
+
+Trust went up even though accuracy didn't change. The mistakes were the same; people could see them now.

@@ -1,0 +1,61 @@
+{
+  "title": "How FlexAI handles a request",
+  "lanes": [
+    { "id": "client", "label": "Client" },
+    { "id": "api", "label": "API layer" },
+    { "id": "services", "label": "Services" },
+    { "id": "data", "label": "Data" },
+    { "id": "external", "label": "External" }
+  ],
+  "nodes": [
+    { "id": "app", "label": "Expo mobile app", "lane": "client", "row": 0, "kind": "client", "tech": "React Native", "note": "Screens for auth, onboarding, workouts, coach, social and analytics. Axios API modules per domain, React Query for server state, Zustand stores for auth and the active workout." },
+    { "id": "middleware", "label": "Express middleware", "lane": "api", "row": 0, "kind": "gateway", "tech": "Express", "note": "app.ts: Helmet, CORS allow-list, gzip, express-rate-limit (off in dev), a request ID header, Morgan logging through Winston, then a central error handler." },
+    { "id": "routes", "label": "Routers + controllers", "lane": "api", "row": 1, "kind": "service", "tech": "Zod", "note": "13 route modules under /api/v1. Most mount authenticate (JWT) and validate() (Zod schemas) before the controller calls a service." },
+    { "id": "workouts", "label": "Workout service", "lane": "services", "row": 0, "kind": "service", "tech": "Prisma", "note": "workout.service.ts: starts and completes workouts, logs sets, and on completion updates the user's streak and awards XP." },
+    { "id": "generator", "label": "Workout generator (RAG)", "lane": "services", "row": 1, "kind": "service", "tech": "Gemini", "note": "WorkoutGenerationService: embeds the request, runs a vector search, prompts Gemini with only those exercises, then drops any exercise ID it was not given." },
+    { "id": "coach", "label": "AI coach", "lane": "services", "row": 2, "kind": "service", "tech": "Gemini", "note": "CoachService: system prompt from the user's profile and recent workouts, last 10 messages as history, replies capped at 500 output tokens, both sides saved." },
+    { "id": "gamification", "label": "Gamification service", "lane": "services", "row": 3, "kind": "service", "tech": "TypeScript", "note": "Fixed XP per action (workout 100, post 20, challenge completed 500), level-ups, daily streak tracking and achievement checks." },
+    { "id": "social", "label": "Social + leaderboards", "lane": "services", "row": 4, "kind": "service", "tech": "TypeScript", "note": "Feed posts, comments, likes, follows and challenges. Leaderboards read and write Redis sorted sets keyed leaderboard:<type>." },
+    { "id": "authsvc", "label": "Auth service", "lane": "services", "row": 5, "kind": "service", "tech": "TypeScript", "note": "Register, login, access and refresh tokens, email OTP verification and password reset, plus Google ID-token sign-in in oauth.service.ts." },
+    { "id": "notifications", "label": "Notification service", "lane": "services", "row": 6, "kind": "service", "tech": "Firebase", "note": "Stores device tokens and the notification inbox, and sends push messages to a user's devices with firebase-admin." },
+    { "id": "postgres", "label": "PostgreSQL", "lane": "data", "row": 0, "kind": "database", "tech": "PostgreSQL", "note": "Prisma schema: users, sessions, exercises, workouts and sets, routines, body metrics, coach chats, social entities, achievements, notifications." },
+    { "id": "vectors", "label": "Exercise embeddings", "lane": "data", "row": 1, "kind": "vector-db", "tech": "PostgreSQL", "note": "pgvector column on exercises (768 dims), filled by prisma/seed-embeddings.ts and searched with the <=> cosine operator." },
+    { "id": "redis", "label": "Redis", "lane": "data", "row": 4, "kind": "cache", "tech": "Redis", "note": "ioredis client with retry backoff. Optional at startup. Compose runs it with a 512mb allkeys-lru cap." },
+    { "id": "gemini", "label": "Gemini API", "lane": "external", "row": 1, "kind": "llm", "tech": "Gemini", "note": "gemini-embedding-001 for vectors and gemini-3-flash-preview for workout plans and coach replies." },
+    { "id": "google", "label": "Google sign-in", "lane": "external", "row": 5, "kind": "external", "tech": "Google", "note": "OAuth2Client.verifyIdToken from google-auth-library checks the ID token sent by the app." },
+    { "id": "smtp", "label": "SMTP server", "lane": "external", "row": 6, "kind": "external", "tech": "Nodemailer", "note": "email.service.ts sends verification and password-reset OTP emails through a configurable SMTP host." },
+    { "id": "fcm", "label": "Firebase Cloud Messaging", "lane": "external", "row": 7, "kind": "external", "tech": "Firebase", "note": "sendEachForMulticast delivers push notifications to the stored device tokens." }
+  ],
+  "edges": [
+    { "from": "app", "to": "middleware", "label": "REST + Bearer JWT", "style": "sync" },
+    { "from": "middleware", "to": "routes", "label": "rate limit, then route", "style": "sync" },
+    { "from": "routes", "to": "workouts", "label": "log and finish workouts", "style": "sync" },
+    { "from": "routes", "to": "generator", "label": "POST /routines/generate", "style": "sync" },
+    { "from": "routes", "to": "coach", "label": "POST /coach/message", "style": "sync" },
+    { "from": "routes", "to": "social", "label": "feed, social, leaderboards", "style": "sync" },
+    { "from": "routes", "to": "authsvc", "label": "register, login, refresh", "style": "sync" },
+    { "from": "routes", "to": "notifications", "label": "devices, inbox", "style": "sync" },
+    { "from": "workouts", "to": "gamification", "label": "streak + XP on finish", "style": "sync" },
+    { "from": "workouts", "to": "postgres", "label": "Prisma SQL", "style": "sync" },
+    { "from": "gamification", "to": "postgres", "label": "xp, achievements", "style": "sync" },
+    { "from": "generator", "to": "vectors", "label": "cosine search, top 30", "style": "sync" },
+    { "from": "generator", "to": "gemini", "label": "embed + generate JSON", "style": "sync" },
+    { "from": "coach", "to": "gemini", "label": "chat call", "style": "sync" },
+    { "from": "coach", "to": "postgres", "label": "messages, user profile", "style": "sync" },
+    { "from": "social", "to": "redis", "label": "ZADD, ZREVRANGE", "style": "sync" },
+    { "from": "social", "to": "postgres", "label": "posts, follows, challenges", "style": "sync" },
+    { "from": "authsvc", "to": "google", "label": "verify ID token", "style": "sync" },
+    { "from": "authsvc", "to": "smtp", "label": "OTP emails", "style": "async" },
+    { "from": "authsvc", "to": "postgres", "label": "users, sessions", "style": "sync" },
+    { "from": "notifications", "to": "fcm", "label": "multicast push", "style": "async" }
+  ],
+  "flow": [
+    "The app calls POST /routines/generate with its JWT. Helmet, CORS and the rate limiter run first, then authenticate and Zod validation.",
+    "The generator embeds a short description of the goal, equipment and level with gemini-embedding-001.",
+    "A cosine-distance query over the pgvector column returns the 30 closest exercises.",
+    "Gemini receives only those exercises and their IDs and returns a warm-up, main block and cool-down as JSON.",
+    "Exercise IDs outside the retrieved set are dropped and the plan goes back to the app.",
+    "Secondary path: when the user finishes a workout, the workout service saves it, updates the streak and awards 100 XP through the gamification service.",
+    "Secondary path: sign-up writes the user to Postgres and emails an OTP over SMTP. Google sign-in verifies the ID token instead."
+  ]
+}

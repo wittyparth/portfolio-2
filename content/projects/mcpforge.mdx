@@ -1,0 +1,55 @@
+---
+name: MCPForge
+tagline: Turns an OpenAPI spec into a hosted, authenticated MCP server, with AI-rewritten tool descriptions and a security scan before deploy.
+year: 2026
+status: shipped
+stack: [FastAPI, Next.js, PostgreSQL, Redis, Celery, MCP, Turborepo, TypeScript]
+repo: https://github.com/wittyparth/mcpforge-monorepo
+role: Solo
+featured: true
+order: 3
+---
+
+## The problem
+
+Wrapping an existing REST API as an MCP server means writing protocol code, hosting it somewhere, and then discovering that the model picks the wrong tool because the descriptions were copied from an OpenAPI summary that was written for humans.
+
+## The approach
+
+You give MCPForge a spec by URL or upload. It validates the spec, turns each operation into an MCP tool, and hosts the result behind a gateway so there is nothing to install locally.
+
+- **Spec ingestion:** the spec is fetched with SSRF checks, validated, de-duplicated by SHA-256 hash, stored in S3, and analysed into tool definitions.
+- **AI description engine:** an LLM rewrites each tool description using the spec details, the sibling tools and few-shot examples. A separate regex-based scorer then rates the result on functionality, accuracy, completeness and context, with no second LLM call.
+- **Security scanner:** eight deterministic rules (DELETE without auth, credential-like fields in responses, prompt-injection text in descriptions, and so on) run before a server is deployed.
+- **Playground and analytics:** a WebSocket playground to try tools before deploying, and per-call analytics for servers that are live.
+
+{/* TODO: confirm how much of the Phase 1 to 5 plan in the README is shipped; the repo's planning notes say the scanner is done but the README checklist is stale */}
+
+## Architecture
+
+The monorepo has two apps. `apps/web` is a Next.js 15 dashboard, and `apps/api` is a single FastAPI service that serves the REST API, the MCP gateway and the WebSocket playground together, so one process on a free tier covers all three. Celery workers read from Redis on separate queues for AI enhancement, security scans and analytics.
+
+Build progress is streamed to the dashboard over SSE: Celery tasks publish to Redis pub/sub and the API fans events out to connected browsers. Clients such as Claude Desktop reach a deployed server through the gateway, which accepts either SSE or StreamableHTTP transport.
+
+<Architecture />
+
+## Calling the upstream API safely
+
+The gateway does not run any generated code. A tool call is a stored config (method, path, parameters) that a dispatcher turns into an HTTP request, after decrypting the stored credential and building the auth header. Before sending, every request URL goes through an SSRF guard that resolves the hostname and rejects any address in a private or loopback range.
+
+```python title="apps/api/app/gateway/ssrf_guard.py"
+for _, _type, _proto, _canonname, sockaddr in addrinfo:
+    ip = ipaddress.ip_address(sockaddr[0])
+    for blocked_net in _ALL_BLOCKED:
+        if ip in blocked_net:
+            raise SSRFBlockedError(
+                f"URL resolves to blocked IP: {sockaddr[0]}",
+            )
+```
+
+The same dispatcher backs both the gateway and the playground. Tool annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`) are derived from the HTTP method when tools are generated.
+
+## What I learned
+
+{/* TODO: rewrite in your own words */}
+Most of the work was around the edges of the MCP protocol: auth, SSRF, rate limits and analytics. The part that looks like the product, turning a spec into tools, was the smaller piece.
