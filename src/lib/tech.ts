@@ -6,7 +6,7 @@ import {
   siOllama, siNumpy, siPandas, siJupyter, siKubernetes, siGithubactions, siLinux, siGooglecloud, siMongodb, siSqlite,
   siTensorflow, siStreamlit, siNginx, siMistralai, siPostman, siBun, siSqlalchemy, siRabbitmq, siCursor, siNotion,
   siFigma, siOpencv, siKeras, siPnpm, siCloudflare, siFramer, siSupabase, siTailwindcss, siTurborepo, siTypescript, siVercel, siVite,
-  siGraphql, siApple, siSpotify, siCplusplus, siGnubash, siElasticsearch, siRender,
+  siGraphql, siApple, siSpotify, siLeetcode, siCplusplus, siGnubash, siElasticsearch, siRender,
   type SimpleIcon,
 } from "simple-icons";
 
@@ -85,6 +85,7 @@ const ICONS: [names: string[], icon: SimpleIcon][] = [
   [["render"], siRender],
   [["apple", "macbook", "macos"], siApple],
   [["spotify"], siSpotify],
+  [["leetcode"], siLeetcode],
 ];
 
 const key = (name: string) => name.toLowerCase().replace(/[\s.\-_/]/g, "");

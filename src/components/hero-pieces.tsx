@@ -2,8 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { motion, useInView, useReducedMotion } from "motion/react";
-import { Bot, Database, Gauge, PhoneCall, Sparkles, Wrench } from "lucide-react";
+import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
 import { SlidingNumber } from "@animate-ui/react/primitives/texts/sliding-number";
 import { MapPin } from "@/components/animate-ui/icons/map-pin";
 import { CloudRain } from "@/components/animate-ui/icons/cloud-rain";
@@ -14,215 +13,263 @@ import type { Weather } from "@/lib/live";
 import { career, profile } from "@/lib/content";
 import { cn } from "@/lib/utils";
 import { Tip } from "./tip";
+import { TechLogo } from "./tech-logo";
 
-/* ───────────────────────── What I build: a draggable agent ───────────────────────── */
+/* ───────────────────────── What I build: an agent, running ───────────────────────── */
 
-type NodeKey = "agent" | "caller" | "llm" | "tools" | "retrieval" | "evals";
-const NODES: Record<NodeKey, { x: number; y: number; label: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; note: string }> = {
-  agent: { x: 160, y: 88, label: "agent", icon: Bot, note: "LangGraph state machines that recover when a step fails." },
-  caller: { x: 42, y: 42, label: "phone call", icon: PhoneCall, note: "Voice agents on real phone calls, built at Lyzr AI." },
-  llm: { x: 278, y: 40, label: "LLM", icon: Sparkles, note: "Gemini, OpenAI or Claude, picked per task." },
-  tools: { x: 286, y: 134, label: "tools", icon: Wrench, note: "Tool calling. MCPForge turns any OpenAPI spec into tools." },
-  retrieval: { x: 40, y: 136, label: "retrieval", icon: Database, note: "RAG over Qdrant, grounded in real schemas (NL2SQL)." },
-  evals: { x: 160, y: 18, label: "evals", icon: Gauge, note: "50+ test cases per voice agent before it ships." },
+type NodeKey = "agent" | "voice" | "llm" | "tools" | "retrieval" | "evals";
+const NODES: Record<NodeKey, { x: number; y: number; label: string; logos: string[]; note: string }> = {
+  agent: { x: 160, y: 62, label: "agent", logos: ["LangGraph"], note: "LangGraph state machines that recover when a step fails." },
+  voice: { x: 36, y: 26, label: "voice", logos: ["LiveKit"], note: "Voice agents on real phone calls, built at Lyzr AI." },
+  llm: { x: 284, y: 26, label: "LLM", logos: ["Claude", "OpenAI API", "Gemini"], note: "Gemini, OpenAI or Claude, picked per task." },
+  tools: { x: 284, y: 118, label: "tools", logos: ["MCP"], note: "Tool calling. MCPForge turns any OpenAPI spec into tools." },
+  retrieval: { x: 36, y: 118, label: "retrieval", logos: ["Qdrant"], note: "RAG over Qdrant, grounded in real schemas (NL2SQL)." },
+  evals: { x: 160, y: 136, label: "evals", logos: ["pytest"], note: "50+ test cases per voice agent before it ships." },
 };
 const W = 320;
-const H = 172;
+const H = 176;
 const STEP = 8;
-const EDGES: NodeKey[] = ["caller", "llm", "tools", "retrieval", "evals"];
+const SPOKES: Exclude<NodeKey, "agent">[] = ["voice", "llm", "tools", "retrieval", "evals"];
+const HOP = 1900;
+
+type Ctx = { weather: Weather | null; time: string | null };
+type Hop = { node: Exclude<NodeKey, "agent">; inbound?: boolean; tag: string; line: (c: Ctx) => string };
+
+// One real request, end to end. The weather and the time are live; the rest is how the agents I build behave.
+const RUN: Hop[] = [
+  { node: "voice", inbound: true, tag: "call", line: () => "“How's Bengaluru right now?”" },
+  { node: "llm", tag: "plan", line: () => "weather(), clock(), then answer" },
+  { node: "tools", tag: "tool", line: (c) => (c.weather ? `weather → ${c.weather.temp}°C, ${c.weather.label.toLowerCase()}` : "weather → no answer, falling back") },
+  { node: "tools", tag: "tool", line: (c) => `clock → ${c.time ?? "--:--"} IST` },
+  { node: "retrieval", tag: "rag", line: () => "“chai or coffee?” → chai, after 4pm" },
+  { node: "evals", tag: "eval", line: () => "grounded in tool output · pass" },
+  {
+    node: "voice",
+    tag: "reply",
+    line: (c) => (c.weather ? `“${c.weather.temp}° and ${c.weather.label.toLowerCase()}. Chai weather.”` : `“It's ${c.time ?? "evening"} here. Chai weather.”`),
+  },
+];
 
 /**
- * The shape of the agents I build. Every node can be dragged (the wires follow), packets run
- * along the wires, and hovering a node explains it.
+ * The shape of the agents I build, mid-run: a request hops node to node with live data,
+ * the trace prints underneath, and every node can be dragged (the wires follow).
  */
-export function AgentGraph() {
+export function AgentGraph({ weather }: { weather: Weather | null }) {
   const [pos, setPos] = React.useState(() =>
     Object.fromEntries(Object.entries(NODES).map(([k, n]) => [k, { x: n.x, y: n.y }])) as Record<NodeKey, { x: number; y: number }>,
   );
-  const [focus, setFocus] = React.useState<NodeKey>("agent");
+  const [count, setCount] = React.useState(0);
+  const hop = count % RUN.length;
+  // The LLM node trades logos each time a run reaches it (hop 1 of every run).
+  const llm = Math.max(0, Math.floor((count - 1) / RUN.length)) % NODES.llm.logos.length;
+  const [hover, setHover] = React.useState<NodeKey | null>(null);
   const [dragging, setDragging] = React.useState<NodeKey | null>(null);
-  // Screen readers hear a node's note only when it takes keyboard focus, never on hover.
-  const [announce, setAnnounce] = React.useState("");
   const [touched, setTouched] = React.useState(false);
+  const [announce, setAnnounce] = React.useState("");
   const wrapRef = React.useRef<HTMLDivElement>(null);
-  const inView = useInView(wrapRef, { margin: "80px" });
-  const svgRef = React.useRef<SVGSVGElement>(null);
-  const packets = React.useRef<(SVGCircleElement | null)[]>([]);
+  const boxRef = React.useRef<HTMLDivElement>(null);
+  const packet = React.useRef<SVGGElement>(null);
   const posRef = React.useRef(pos);
+  const inView = useInView(wrapRef, { margin: "80px" });
   const reduce = useReducedMotion();
+  const ist = useIst();
+  const time = ist ? `${String(ist.h).padStart(2, "0")}:${String(ist.m).padStart(2, "0")}` : null;
 
   React.useEffect(() => {
     posRef.current = pos;
   }, [pos]);
 
-  // Packets ride the wires: out to a node and back, each on its own phase. Updated directly, no re-render.
+  // Advance the run one hop at a time while the tile is on screen.
   React.useEffect(() => {
     if (reduce || !inView) return;
+    const id = window.setInterval(() => {
+      setCount((c) => c + 1);
+    }, HOP);
+    return () => window.clearInterval(id);
+  }, [reduce, inView]);
+
+  // The packet rides the active wire. Written straight to the DOM, no re-render per frame.
+  React.useEffect(() => {
+    if (reduce || !inView) return;
+    const start = performance.now();
+    const h = RUN[hop];
     let raf = 0;
     const tick = (t: number) => {
+      const el = packet.current;
       const p = posRef.current;
-      EDGES.forEach((k, i) => {
-        const el = packets.current[i];
-        if (!el) return;
-        const phase = ((t / 1600 + i * 0.37) % 2 + 2) % 2;
-        const f = phase < 1 ? phase : 2 - phase;
-        el.setAttribute("cx", String(p.agent.x + (p[k].x - p.agent.x) * f));
-        el.setAttribute("cy", String(p.agent.y + (p[k].y - p.agent.y) * f));
-      });
-      raf = requestAnimationFrame(tick);
+      const k = Math.min(1, (t - start) / (HOP * 0.62));
+      const e = 1 - Math.pow(1 - k, 3);
+      const [from, to] = h.inbound ? [p[h.node], p.agent] : [p.agent, p[h.node]];
+      el?.setAttribute("transform", `translate(${from.x + (to.x - from.x) * e} ${from.y + (to.y - from.y) * e})`);
+      el?.setAttribute("opacity", k < 1 ? "1" : "0");
+      if (k < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [reduce, inView]);
+  }, [hop, reduce, inView]);
 
-  const toSvg = (e: React.PointerEvent) => {
-    const svg = svgRef.current;
-    const m = svg?.getScreenCTM();
-    if (!svg || !m) return null;
-    const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse());
-    return { x: Math.min(W - 14, Math.max(14, pt.x)), y: Math.min(H - 26, Math.max(14, pt.y)) };
+  const toBox = (e: React.PointerEvent) => {
+    const r = boxRef.current?.getBoundingClientRect();
+    if (!r) return null;
+    return {
+      x: Math.min(W - 20, Math.max(20, ((e.clientX - r.left) / r.width) * W)),
+      y: Math.min(H - 26, Math.max(18, ((e.clientY - r.top) / r.height) * H)),
+    };
   };
-
   const nudge = (k: NodeKey, dx: number, dy: number) =>
-    setPos((s) => ({
-      ...s,
-      [k]: { x: Math.min(W - 14, Math.max(14, s[k].x + dx)), y: Math.min(H - 26, Math.max(14, s[k].y + dy)) },
-    }));
+    setPos((s) => ({ ...s, [k]: { x: Math.min(W - 20, Math.max(20, s[k].x + dx)), y: Math.min(H - 26, Math.max(18, s[k].y + dy)) } }));
+
+  const active = RUN[hop].node;
+  const ctx: Ctx = { weather, time };
+  const shown = (reduce ? [RUN.length - 3, RUN.length - 2, RUN.length - 1] : [count - 2, count - 1, count]).filter((n) => n >= 0);
 
   return (
-    <div className="relative" ref={wrapRef}>
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${W} ${H}`}
-        className="w-full select-none"
-        onPointerMove={(e) => {
-          if (!dragging) return;
-          const p = toSvg(e);
-          if (p) setPos((s) => ({ ...s, [dragging]: p }));
-        }}
-        onPointerUp={() => setDragging(null)}
-        onPointerCancel={() => setDragging(null)}
-        onLostPointerCapture={() => setDragging(null)}
-        onPointerLeave={() => setDragging(null)}
-        role="group"
-        aria-label="Diagram of an AI agent: phone call, LLM, tools, retrieval and evals around an agent"
-      >
-        <defs>
-          <pattern id="agent-dots" width="12" height="12" patternUnits="userSpaceOnUse">
-            <circle cx="1" cy="1" r="0.7" className="fill-foreground/10" />
-          </pattern>
-        </defs>
-        <rect width={W} height={H} fill="url(#agent-dots)" />
-
-        {EDGES.map((k) => {
-          const lit = focus === k || focus === "agent";
-          return (
-            <motion.line
-              key={k}
-              x1={pos.agent.x}
-              y1={pos.agent.y}
-              x2={pos[k].x}
-              y2={pos[k].y}
-              strokeWidth={lit ? 1.4 : 1}
-              strokeDasharray={k === "evals" ? "3 3" : undefined}
-              className={cn("transition-[stroke] duration-300", lit ? "stroke-foreground/45" : "stroke-foreground/15")}
-              initial={reduce ? false : { pathLength: 0 }}
-              animate={{ pathLength: 1 }}
-              transition={{ duration: 0.8, delay: 0.4 + EDGES.indexOf(k) * 0.08 }}
-            />
-          );
-        })}
-        {EDGES.map((k, i) => (
-          <circle
-            key={k}
-            ref={(el) => {
-              packets.current[i] = el;
-            }}
-            r={2.2}
-            cx={pos.agent.x}
-            cy={pos.agent.y}
-            className={cn("transition-[fill] duration-300", focus === k ? "fill-emerald-500" : "fill-foreground/60")}
-          />
-        ))}
+    <div ref={wrapRef} className="relative">
+      <div ref={boxRef} className="relative w-full select-none" style={{ aspectRatio: `${W} / ${H}` }}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 size-full overflow-visible" aria-hidden>
+          <defs>
+            <pattern id="agent-dots" width="12" height="12" patternUnits="userSpaceOnUse">
+              <circle cx="1" cy="1" r="0.7" className="fill-foreground/[0.12]" />
+            </pattern>
+          </defs>
+          <rect x={-8} y={-6} width={W + 16} height={H + 12} fill="url(#agent-dots)" />
+          {SPOKES.map((k, i) => {
+            const on = k === active || k === hover;
+            return (
+              <motion.line
+                key={k}
+                x1={pos.agent.x}
+                y1={pos.agent.y}
+                x2={pos[k].x}
+                y2={pos[k].y}
+                strokeWidth={on ? 1.5 : 1}
+                strokeDasharray={on ? undefined : "2 4"}
+                className={cn("transition-[stroke] duration-500", on ? "stroke-foreground/55" : "stroke-foreground/20")}
+                initial={reduce ? false : { pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.8, delay: 0.4 + i * 0.08 }}
+              />
+            );
+          })}
+          {!reduce && (
+            <g ref={packet} opacity={0}>
+              <circle r={7} className="fill-emerald-500/20" />
+              <circle r={3} className="fill-emerald-500" />
+            </g>
+          )}
+        </svg>
 
         {(Object.keys(NODES) as NodeKey[]).map((k) => {
           const n = NODES[k];
-          const Icon = n.icon;
           const hub = k === "agent";
-          const r = hub ? 19 : 14;
+          const live = !reduce && k === active;
+          const logo = k === "llm" ? n.logos[llm] : n.logos[0];
           return (
-            <g
+            <button
               key={k}
-              transform={`translate(${pos[k].x} ${pos[k].y})`}
-              className={cn("touch-none outline-none", dragging === k ? "cursor-grabbing" : "cursor-grab")}
-              tabIndex={0}
-              role="button"
-              aria-label={`${n.label}, draggable. Arrow keys move it, Enter reads the note.`}
-              onPointerEnter={() => setFocus(k)}
-              onFocus={() => {
-                setFocus(k);
-                setAnnounce(`${n.label}: ${n.note}`);
-              }}
-              onKeyDown={(e) => {
-                const d = { ArrowLeft: [-STEP, 0], ArrowRight: [STEP, 0], ArrowUp: [0, -STEP], ArrowDown: [0, STEP] }[e.key];
-                if (d) {
-                  e.preventDefault();
-                  setTouched(true);
-                  nudge(k, d[0], d[1]);
-                } else if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setFocus(k);
-                  setAnnounce(`${n.label}: ${n.note}`);
-                }
-              }}
+              type="button"
+              title={n.note}
+              aria-label={`${n.label}: ${n.note} Draggable; arrow keys move it.`}
+              onPointerEnter={() => setHover(k)}
+              onPointerLeave={() => setHover(null)}
+              onFocus={() => setAnnounce(`${n.label}: ${n.note}`)}
               onPointerDown={(e) => {
                 setTouched(true);
-                (e.target as Element).setPointerCapture?.(e.pointerId);
+                e.currentTarget.setPointerCapture(e.pointerId);
                 setDragging(k);
-                setFocus(k);
               }}
+              onPointerMove={(e) => {
+                if (dragging !== k) return;
+                const p = toBox(e);
+                if (p) setPos((s) => ({ ...s, [k]: p }));
+              }}
+              onPointerUp={() => setDragging(null)}
+              onPointerCancel={() => setDragging(null)}
+              onLostPointerCapture={() => setDragging(null)}
+              onKeyDown={(e) => {
+                const d = { ArrowLeft: [-STEP, 0], ArrowRight: [STEP, 0], ArrowUp: [0, -STEP], ArrowDown: [0, STEP] }[e.key];
+                if (!d) return;
+                e.preventDefault();
+                setTouched(true);
+                nudge(k, d[0], d[1]);
+              }}
+              className={cn(
+                "group/node absolute flex -translate-x-1/2 -translate-y-[38%] touch-none flex-col items-center gap-1.5 outline-none",
+                dragging === k ? "z-20 cursor-grabbing" : "z-10 cursor-grab",
+              )}
+              style={{ left: `${(pos[k].x / W) * 100}%`, top: `${(pos[k].y / H) * 100}%` }}
             >
-              <motion.g initial={reduce ? false : { scale: 0 }} animate={{ scale: dragging === k ? 1.15 : 1 }} transition={{ type: "spring", stiffness: 400, damping: 20 }}>
-                {focus === k && <circle r={r + 5} className="fill-none stroke-foreground/20" strokeDasharray="2 3" />}
-                <circle
-                  r={r}
-                  className={cn(
-                    "transition-[fill,stroke] duration-300",
-                    hub ? "fill-foreground stroke-foreground" : focus === k ? "fill-background stroke-foreground/60" : "fill-background stroke-foreground/20",
-                  )}
-                />
-                <Icon
-                  x={hub ? -9 : -7}
-                  y={hub ? -9 : -7}
-                  width={hub ? 18 : 14}
-                  height={hub ? 18 : 14}
-                  className={hub ? "text-background" : "text-foreground/80"}
-                  strokeWidth={1.8}
-                />
-              </motion.g>
-              <text y={r + 15} textAnchor="middle" className="fill-muted-foreground text-[12px]">
-                {n.label}
-              </text>
-            </g>
+              <motion.span
+                initial={reduce ? false : { scale: 0.4, opacity: 0 }}
+                animate={{ scale: dragging === k ? 1.12 : live ? 1.06 : 1, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 420, damping: 22 }}
+                className={cn(
+                  "relative grid place-items-center bg-white shadow-[0_1px_2px_rgb(0_0_0/0.16),0_8px_16px_-8px_rgb(0_0_0/0.45)] ring-1 transition-shadow duration-300 group-focus-visible/node:ring-2 group-focus-visible/node:ring-foreground",
+                  hub ? "size-11 rounded-[14px] ring-foreground/50 sm:size-12" : "size-9 rounded-[11px] sm:size-10",
+                  !hub && (live ? "ring-2 ring-emerald-500" : "ring-black/10"),
+                )}
+              >
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.span
+                    key={logo}
+                    initial={{ opacity: 0, scale: 0.6, filter: "blur(3px)" }}
+                    animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, scale: 0.6, filter: "blur(3px)" }}
+                    transition={{ duration: 0.3 }}
+                    className="grid place-items-center"
+                  >
+                    <TechLogo name={logo} className={cn("dark:invert-0", hub ? "size-6 sm:size-7" : "size-5 sm:size-[22px]")} />
+                  </motion.span>
+                </AnimatePresence>
+                {hub && !reduce && (
+                  <span aria-hidden className="absolute -inset-1.5 animate-ping rounded-[17px] border border-foreground/20 [animation-duration:2.6s]" />
+                )}
+              </motion.span>
+              <span className={cn("text-xs leading-none transition-colors duration-300", live || hover === k ? "text-foreground" : "text-muted-foreground")}>
+                {k === "llm" ? logo.replace(" API", "") : n.label}
+              </span>
+            </button>
           );
         })}
-      </svg>
-      <motion.span
-        aria-hidden
-        className="pointer-events-none absolute top-0 right-0 text-xs text-muted-foreground"
-        animate={{ opacity: touched ? 0 : 1 }}
-        transition={{ duration: 0.5 }}
-      >
-        drag the nodes
-      </motion.span>
-      <p className="mt-1 min-h-[2.5rem] text-[13px] leading-snug text-pretty text-muted-foreground">
-        <span className="font-medium text-foreground">{NODES[focus].label} · </span>
-        {NODES[focus].note}
-      </p>
+        <motion.span
+          aria-hidden
+          className="pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 text-xs whitespace-nowrap text-muted-foreground"
+          animate={{ opacity: touched ? 0 : 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          drag the nodes
+        </motion.span>
+      </div>
+
+      {/* The trace: the last three hops, newest at the bottom. Mono because it is a log. */}
+      <ol aria-hidden className="mt-3 h-[4.4rem] overflow-hidden border-t border-dashed border-border pt-2 font-mono text-[11.5px] leading-[1.35rem]">
+        <AnimatePresence initial={false} mode="popLayout">
+          {shown.map((n, row, all) => {
+            const i = n % RUN.length;
+            const newest = row === all.length - 1;
+            const age = all.length - 1 - row;
+            return (
+            <motion.li
+              key={n}
+              layout={!reduce}
+              initial={reduce ? false : { opacity: 0, y: 10, filter: "blur(3px)" }}
+              animate={{ opacity: age === 0 ? 1 : age === 1 ? 0.55 : 0.28, y: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="flex min-w-0 gap-2.5"
+            >
+              <span className={cn("w-10 shrink-0", newest ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>{RUN[i].tag}</span>
+              <span className="truncate text-foreground">{RUN[i].line(ctx)}</span>
+            </motion.li>
+            );
+          })}
+        </AnimatePresence>
+      </ol>
       <span className="sr-only" aria-live="polite">{announce}</span>
     </div>
   );
 }
+
 
 /* ───────────────────────── Journey: IIT → Pursuit → Lyzr ───────────────────────── */
 
@@ -253,7 +300,7 @@ export function Journey() {
   const edu = active === 0;
 
   return (
-    <div ref={wrapRef}>
+    <div ref={wrapRef} className="my-auto">
       <div className="relative w-full" style={{ aspectRatio: `${JW} / ${JH}` }}>
         <svg ref={svgRef} viewBox={`0 0 ${JW} ${JH}`} className="absolute inset-0 size-full" aria-hidden>
           <path d={JPATH} className="fill-none stroke-foreground/10" strokeWidth={6} strokeLinecap="round" />

@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { TopographyBackground } from "@/components/animate-ui/backgrounds/topography";
 import { Spring, SpringElement, SpringProvider } from "@animate-ui/react/primitives/spring";
@@ -10,7 +9,8 @@ import { CountingNumber } from "@animate-ui/react/primitives/texts/counting-numb
 import { AnimateIcon } from "@animate-ui/react/icons";
 import { FileText } from "@/components/animate-ui/icons/file-text";
 import { Mail } from "@/components/animate-ui/icons/mail";
-import { Rocket, Timer, Trophy } from "lucide-react";
+import { Rocket, Timer } from "lucide-react";
+import { TechLogo } from "./tech-logo";
 import type { Weather } from "@/lib/live";
 import { profile } from "@/lib/content";
 import { cn } from "@/lib/utils";
@@ -100,6 +100,8 @@ function Scribble({ children }: { children: React.ReactNode }) {
   );
 }
 
+const LeetCode = ({ className }: { className?: string }) => <TechLogo name="LeetCode" className={cn(className, "!text-foreground")} />;
+
 function Fact({ icon: Icon, children, tip }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode; tip: string }) {
   return (
     <Tip label={tip}>
@@ -135,15 +137,14 @@ export function Hero({ weather, streak, shipped }: { weather: Weather | null; st
               <Tip label="Drag me">
                 <SpringElement className="relative inline-block cursor-grab touch-none active:cursor-grabbing">
                   <span className="relative block">
-                    <Image
-                      src={`https://github.com/${profile.github}.png`}
-                      alt={profile.name}
-                      width={56}
-                      height={56}
-                      priority
-                      draggable={false}
-                      className="size-14 rounded-full border border-border bg-muted"
-                    />
+                    {/* TODO: swap for a real portrait at /photos/me.jpg when you have one. */}
+                    <span
+                      aria-label={profile.name}
+                      role="img"
+                      className="grid size-14 place-items-center rounded-full bg-foreground text-[1.15rem] font-semibold tracking-[-0.04em] text-background shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--background)_18%,transparent),0_6px_16px_-8px_rgb(0_0_0/0.5)]"
+                    >
+                      PS
+                    </span>
                     <PresenceDot presence={presence} />
                   </span>
                 </SpringElement>
@@ -172,7 +173,7 @@ export function Hero({ weather, streak, shipped }: { weather: Weather | null; st
             <Fact icon={Timer} tip="Customer AI prototypes at Lyzr AI">
               <span className="font-mono text-foreground">2–4</span> day prototypes
             </Fact>
-            <Fact icon={Trophy} tip="LeetCode Knight, top 4.7% globally">
+            <Fact icon={LeetCode} tip="LeetCode Knight, contest rating 1887">
               Knight <span className="font-mono text-foreground">1887</span>
             </Fact>
           </div>
@@ -223,11 +224,11 @@ export function Hero({ weather, streak, shipped }: { weather: Weather | null; st
 
         {/* What I build */}
         <Tile delay={0.1} label="What I build" className="col-span-2 sm:col-span-3">
-          <AgentGraph />
+          <AgentGraph weather={weather} />
         </Tile>
 
         {/* Where I've been */}
-        <Tile delay={0.15} label="Path so far" className="col-span-2 sm:col-span-3">
+        <Tile delay={0.15} label="Path so far" className="col-span-2 flex flex-col sm:col-span-3">
           <Journey />
         </Tile>
 
