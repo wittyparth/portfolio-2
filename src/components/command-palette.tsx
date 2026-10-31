@@ -23,7 +23,7 @@ import { MessageCircleMore } from "@/components/animate-ui/icons/message-circle-
 import { ExternalLink } from "@/components/animate-ui/icons/external-link";
 import { profile, socials } from "@/lib/content";
 import { useSound } from "./sound";
-import { openResume } from "./resume";
+import { PALETTE_EVENT, openResume, settle, takePending } from "@/lib/overlays";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 
 export type SearchIndex = {
@@ -31,8 +31,7 @@ export type SearchIndex = {
   posts: { slug: string; title: string; minutes: number; tags: string[] }[];
 };
 
-const OPEN_EVENT = "open-command-palette";
-export const openCommandPalette = () => window.dispatchEvent(new Event(OPEN_EVENT));
+export { openCommandPalette } from "@/lib/overlays";
 
 function Palette({ close, index }: { close: () => void; index: SearchIndex }) {
   const router = useRouter();
@@ -125,7 +124,8 @@ function Palette({ close, index }: { close: () => void; index: SearchIndex }) {
 }
 
 export function CommandPalette({ index }: { index: SearchIndex }) {
-  const [open, setOpen] = React.useState(false);
+  // Opens immediately if ⌘K or Search was used before this lazily loaded component mounted.
+  const [open, setOpen] = React.useState(() => takePending(PALETTE_EVENT));
   const mobile = useIsMobile();
   const close = React.useCallback(() => setOpen(false), []);
 
@@ -136,12 +136,15 @@ export function CommandPalette({ index }: { index: SearchIndex }) {
         setOpen((o) => !o);
       }
     };
-    const onOpen = () => setOpen(true);
+    const onOpen = () => {
+      settle(PALETTE_EVENT);
+      setOpen(true);
+    };
     window.addEventListener("keydown", onKey);
-    window.addEventListener(OPEN_EVENT, onOpen);
+    window.addEventListener(PALETTE_EVENT, onOpen);
     return () => {
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener(OPEN_EVENT, onOpen);
+      window.removeEventListener(PALETTE_EVENT, onOpen);
     };
   }, []);
 

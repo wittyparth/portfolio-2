@@ -5,7 +5,7 @@ import {
   ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { profile } from "@/lib/content";
-import { openCommandPalette } from "./command-palette";
+import { openCommandPalette } from "@/lib/overlays";
 import { useSound } from "./sound";
 
 export function SiteContextMenu({ children }: { children: React.ReactNode }) {

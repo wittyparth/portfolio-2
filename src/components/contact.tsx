@@ -14,7 +14,7 @@ import { profile, socials } from "@/lib/content";
 import { FileText } from "@/components/animate-ui/icons/file-text";
 import { AnimateIcon } from "@animate-ui/react/icons";
 import { BrandIcon } from "./brand-icon";
-import { openResume } from "./resume";
+import { openResume } from "@/lib/overlays";
 import { Tip } from "./tip";
 
 export function Contact() {

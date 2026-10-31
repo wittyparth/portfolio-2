@@ -31,8 +31,7 @@ import { MessageCircleMore } from "@/components/animate-ui/icons/message-circle-
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useSound } from "./sound";
 import { useIsMobile } from "@/hooks/use-is-mobile";
-import { openCommandPalette } from "./command-palette";
-import { openResume } from "./resume";
+import { openCommandPalette, openResume } from "@/lib/overlays";
 import { TypeSettings } from "./type-settings";
 import { FileText } from "@/components/animate-ui/icons/file-text";
 import { Tip } from "./tip";

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { RESUME_EVENT, settle, takePending } from "@/lib/overlays";
 import dynamic from "next/dynamic";
 import { Download, Minus, Plus, X } from "lucide-react";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -13,8 +14,8 @@ import { Tip } from "./tip";
 const ResumePaper = dynamic(() => import("./resume-paper").then((m) => m.ResumePaper), { ssr: false });
 
 export const RESUME = "/documents/Resume.pdf";
-const OPEN_EVENT = "open-resume";
-export const openResume = () => window.dispatchEvent(new Event(OPEN_EVENT));
+// Kept for existing imports; the trigger itself lives in lib/overlays so callers don't pull this file in.
+export { openResume } from "@/lib/overlays";
 
 type Status = "loading" | "printing" | "ready" | "error";
 const LABEL: Record<Status, string> = { loading: "warming up", printing: "printing", ready: "ready", error: "paper jam" };
@@ -23,18 +24,20 @@ const tool =
   "grid size-8 place-items-center rounded-full text-neutral-400 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent";
 
 export function ResumeViewer() {
-  const [open, setOpen] = React.useState(false);
+  // Opens immediately if the resume was asked for before this lazily loaded component mounted.
+  const [open, setOpen] = React.useState(() => takePending(RESUME_EVENT));
   const [zoom, setZoom] = React.useState(1);
   const [state, setState] = React.useState<{ status: Status; pages?: number }>({ status: "loading" });
 
   React.useEffect(() => {
     const onOpen = () => {
+      settle(RESUME_EVENT);
       setState({ status: "loading" });
       setZoom(1);
       setOpen(true);
     };
-    window.addEventListener(OPEN_EVENT, onOpen);
-    return () => window.removeEventListener(OPEN_EVENT, onOpen);
+    window.addEventListener(RESUME_EVENT, onOpen);
+    return () => window.removeEventListener(RESUME_EVENT, onOpen);
   }, []);
 
   const paper = React.useRef<HTMLDivElement>(null);

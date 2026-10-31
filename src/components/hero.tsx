@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { TopographyBackground } from "@/components/animate-ui/backgrounds/topography";
+import dynamic from "next/dynamic";
 import { Spring, SpringElement, SpringProvider } from "@animate-ui/react/primitives/spring";
 import { SplittingText } from "@animate-ui/react/primitives/texts/splitting";
 import { CountingNumber } from "@animate-ui/react/primitives/texts/counting-number";
@@ -19,8 +19,11 @@ import { PhotoStack } from "./photo-stack";
 import { Tip } from "./tip";
 import { NameAudio } from "./name-audio";
 import { PresenceDot, usePresence } from "./presence";
-import { openResume } from "./resume";
+import { openResume } from "@/lib/overlays";
 import { AgentGraph, Journey, LocalStrip } from "./hero-pieces";
+
+// Decoration only: loaded after the page is idle, never on phones (see `backdrop` below).
+const TopographyBackground = dynamic(() => import("@/components/animate-ui/backgrounds/topography").then((m) => m.TopographyBackground), { ssr: false });
 
 /** A bento tile: a soft spotlight follows the pointer across it. */
 function Tile({ className, children, delay = 0, label }: { className?: string; children: React.ReactNode; delay?: number; label?: string }) {
