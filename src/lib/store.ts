@@ -27,11 +27,17 @@ export interface Store {
   zcard(key: string): Promise<number>;
 }
 
-// Keys written outside production get a "dev:" prefix so local testing never touches live data.
-const NS = process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production" ? "" : "dev:";
+// Upstash's own names, or the KV_* names the Vercel Marketplace integration injects.
+const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
+const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
+// On Vercel, only the production deployment is "production"; previews are built with NODE_ENV=production too.
+const production = process.env.VERCEL_ENV ? process.env.VERCEL_ENV === "production" : process.env.NODE_ENV === "production";
+
+// Keys written outside production get a prefix so local testing and preview deploys never touch live data.
+const NS = production ? "" : process.env.VERCEL_ENV === "preview" ? "preview:" : "dev:";
 
 function upstash(): Store {
-  const r = Redis.fromEnv();
+  const r = new Redis({ url: REDIS_URL!, token: REDIS_TOKEN! });
   const raw: Store = {
     persistent: true,
     get: (k) => r.get(k),
@@ -145,8 +151,7 @@ function memory(): Store {
   };
 }
 
-const configured = Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
-const production = process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
+const configured = Boolean(REDIS_URL && REDIS_TOKEN);
 
 export const store: Store = configured ? upstash() : memory();
 
@@ -164,7 +169,7 @@ export function storeUnavailable(): Response | null {
   if (!warned) {
     warned = true;
     console.error(
-      "[store] UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN are missing in production. " +
+      "[store] UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN (or KV_REST_API_URL / KV_REST_API_TOKEN) are missing. " +
         "Write endpoints are returning 503 until they are set.",
     );
   }

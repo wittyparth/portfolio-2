@@ -85,10 +85,14 @@ export function Contact() {
 export function VisitorCount() {
   const [views, setViews] = React.useState<number | null>(null);
   React.useEffect(() => {
-    fetch("/api/views", { method: "POST" })
-      .then((r) => r.json())
-      .then((d: { views: number | null }) => setViews(d.views))
+    const ctrl = new AbortController();
+    fetch("/api/views", { method: "POST", signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { views?: unknown } | null) => {
+        if (typeof d?.views === "number" && d.views > 0) setViews(d.views);
+      })
       .catch(() => {});
+    return () => ctrl.abort();
   }, []);
   if (views === null) return null;
   return (
