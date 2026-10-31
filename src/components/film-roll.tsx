@@ -22,7 +22,7 @@ function Sprockets() {
   );
 }
 
-function Frame({ shot, index, onOpen, onFocus }: { shot: LifeShot; index: number; onOpen: () => void; onFocus: () => void }) {
+function Frame({ shot, index, first, onOpen, onFocus }: { shot: LifeShot; index: number; first: boolean; onOpen: () => void; onFocus: () => void }) {
   return (
     <motion.li
       layout
@@ -48,6 +48,8 @@ function Frame({ shot, index, onOpen, onFocus }: { shot: LifeShot; index: number
           alt={shot.alt}
           fill
           sizes="240px"
+          priority={first}
+          loading={first ? "eager" : "lazy"}
           draggable={false}
           className="object-cover saturate-[0.92] transition duration-500 ease-out group-hover:scale-[1.04] group-hover:saturate-100"
         />
@@ -136,8 +138,8 @@ export function FilmRoll() {
                 <span className="text-right text-[11px] tracking-[0.35em] text-[#d98a3a]/50">◂ LOAD END</span>
               </li>
               <AnimatePresence mode="popLayout" initial={false}>
-                {shots.map((s) => (
-                  <Frame key={s.src} shot={s} index={life.indexOf(s)} onOpen={() => openShot(s)} onFocus={() => setHovered(s)} />
+                {shots.map((s, i) => (
+                  <Frame key={s.src} shot={s} first={i === 0} index={life.indexOf(s)} onOpen={() => openShot(s)} onFocus={() => setHovered(s)} />
                 ))}
               </AnimatePresence>
             </motion.ul>

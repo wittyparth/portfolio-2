@@ -7,7 +7,7 @@ export async function getContributions(): Promise<Contributions | null> {
   try {
     const res = await fetch(
       `https://github-contributions-api.jogruber.de/v4/${profile.github}?y=last`,
-      { next: { revalidate: 3600 } },
+      { next: { revalidate: 3600 }, signal: AbortSignal.timeout(4000) },
     );
     if (!res.ok) return null;
     const json = (await res.json()) as { total: { lastYear: number }; contributions: Day[] };
@@ -45,7 +45,7 @@ export async function getWeather(): Promise<Weather | null> {
     const { lat, lon } = profile.coords;
     const res = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,is_day&timezone=Asia%2FKolkata`,
-      { next: { revalidate: 900 } },
+      { next: { revalidate: 900 }, signal: AbortSignal.timeout(4000) },
     );
     if (!res.ok) return null;
     const json = (await res.json()) as {

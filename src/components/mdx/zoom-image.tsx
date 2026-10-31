@@ -14,7 +14,7 @@ export function ZoomImage({ src, alt = "", caption }: { src: string; alt?: strin
         <DialogTrigger asChild>
           <button
             type="button"
-            aria-label={`Enlarge image: ${alt}`}
+            aria-label={alt ? `Enlarge image: ${alt}` : "Enlarge image"}
             className="block w-full cursor-zoom-in overflow-hidden rounded-xl border border-border bg-muted outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           >
             <Image src={src} alt={alt} width={1600} height={1000} sizes="(min-width: 768px) 720px, 100vw" className="h-auto w-full" />

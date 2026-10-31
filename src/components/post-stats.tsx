@@ -27,7 +27,11 @@ export function PostStatsProvider({ slug, children }: { slug: string; children: 
 
   React.useEffect(() => {
     let cancelled = false;
-    fetch(`/api/blog/${slug}`, { method: "POST", body: JSON.stringify({ action: "view" }) })
+    fetch(`/api/blog/${slug}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "view" }),
+    })
       .then((r) => (r.ok ? r.json() : null))
       .then((s: Stats | null) => !cancelled && s && setStats(s))
       .catch(() => {});
@@ -39,10 +43,17 @@ export function PostStatsProvider({ slug, children }: { slug: string; children: 
   const react = React.useCallback(() => {
     // Optimistic: the heart responds at once, the server's numbers replace the guess.
     setStats((s) => (s && s.mine < s.max ? { ...s, mine: s.mine + 1, reactions: s.reactions + 1 } : s));
-    fetch(`/api/blog/${slug}`, { method: "POST", body: JSON.stringify({ action: "react" }) })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((s: Stats | null) => s && setStats(s))
-      .catch(() => {});
+    // If the request fails, take the guess back so the count never claims a reaction the server didn't record.
+    const rollback = () =>
+      setStats((s) => (s && s.mine > 0 ? { ...s, mine: s.mine - 1, reactions: Math.max(0, s.reactions - 1) } : s));
+    fetch(`/api/blog/${slug}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "react" }),
+    })
+      .then((r) => (r.ok ? (r.json() as Promise<Stats>) : Promise.reject(new Error(String(r.status)))))
+      .then((s) => setStats(s))
+      .catch(rollback);
   }, [slug]);
 
   return <PostStatsContext.Provider value={{ stats, react }}>{children}</PostStatsContext.Provider>;
