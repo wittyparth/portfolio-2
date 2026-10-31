@@ -50,7 +50,7 @@ export const socialPosts: SocialPost[] = [
   {
     platform: "linkedin",
     date: "2026-09-02",
-    text: "New post on the blog: OpenAPI is almost an MCP server.\n\nThe mapping from an OpenAPI operation to an MCP tool is nearly mechanical. The interesting part is everything that isn't.",
+    text: "New post on the blog: the AI engineer's starter kit.\n\nTerminal, Linux, git, Python environments, Docker and VS Code, everything to set up before ML and AI work.",
     url: "https://www.linkedin.com/",
     metrics: { likes: 87, comments: 12 },
     placeholder: true,

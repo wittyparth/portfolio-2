@@ -1,0 +1,386 @@
+---
+title: "AI Engineering Starter Kit: Tools to Learn First"
+summary: "The terminal, Linux, git, Python environments, Docker and VS Code setup you need before ML and AI work, explained plainly with commands that work."
+date: 2026-09-05
+type: tutorial
+tags: [ai-engineering, tooling, python, docker, git]
+pinned: true
+---
+
+The AI engineering starter kit is six ordinary tools: a shell, basic Linux, git, an isolated Python environment, Docker, and a configured editor. Learn those before you touch a model. Most of the time I lose on AI projects is not lost on the model. It is lost on a broken environment, a leaked key, or a command I only half understand.
+
+This is the first post in a six-part series. This one covers the tooling. The [next one](/blog/math-for-machine-learning) covers the math, and the later ones move into [prompt engineering](/blog/prompt-engineering), [context engineering](/blog/context-engineering), [RAG](/blog/rag-explained) and [advanced RAG](/blog/advanced-rag). I work as an AI engineer at Lyzr AI and graduated from IIT (ISM) Dhanbad in 2025, and this is the toolset I would hand a junior on day one.
+
+## What do you need to know before starting AI engineering?
+
+You need to be comfortable doing five things without a tutorial open:
+
+1. Navigate and edit files from a terminal.
+2. Connect to a remote Linux machine and read its logs.
+3. Commit your work and undo a mistake with git.
+4. Create a Python environment you can recreate on another machine.
+5. Run a service in a container.
+
+Math matters too, but it comes second, and you can learn it alongside the code. The rest of this post takes each item in order.
+
+## Terminal and shell basics
+
+The terminal is a text interface to your operating system. The program running inside it is the shell, usually zsh on macOS and bash on most Linux distributions. They are nearly identical for everyday use.
+
+### The commands you actually use
+
+```bash title="terminal"
+pwd                    # where am I
+ls -la                 # list files, including hidden ones, with details
+cd ~/projects          # change directory (~ is your home folder)
+mkdir -p data/raw      # create nested folders, no error if they exist
+cp a.txt b.txt         # copy
+mv b.txt notes/        # move or rename
+rm old.txt             # delete (no recycle bin, so be careful)
+cat config.yaml        # print a file
+less big.log           # page through a file, q to quit
+head -n 20 data.csv    # first 20 lines
+tail -f app.log        # follow a log as it grows
+```
+
+Two more earn their place daily. `grep` searches inside text, and `find` searches for files:
+
+```bash title="terminal"
+grep -rn "OPENAI_API_KEY" src/      # recursive search with line numbers
+find . -name "*.ipynb" -not -path "./.venv/*"
+```
+
+### Pipes and redirects
+
+A pipe (`|`) sends the output of one command into the input of the next. This is the single most useful idea in the shell.
+
+```bash title="terminal"
+# which 5 file extensions are most common in this repo?
+find . -type f -not -path "./.git/*" -name "*.*" | sed 's/.*\.//' | sort | uniq -c | sort -rn | head -5
+
+# save output to a file (overwrite) or append to it
+python train.py > run.log
+python train.py >> run.log 2>&1   # append stdout and stderr together
+```
+
+### Environment variables
+
+An environment variable is a named string that every program you launch can read. API keys, database URLs and feature flags usually live here.
+
+```bash title="terminal"
+export MODEL_NAME="my-model"   # set for this shell session
+echo $MODEL_NAME
+env | grep MODEL               # inspect
+```
+
+```python title="read_env.py"
+import os
+
+model = os.environ.get("MODEL_NAME", "default-model")
+print(model)
+```
+
+A variable set with `export` disappears when the terminal closes. For anything permanent, put it in your shell config (`~/.zshrc`) or, better for projects, in a dotenv file (covered below).
+
+<Callout>
+  `PATH` is just an environment variable listing the folders your shell searches for commands. When you see "command not found" right after installing something, the usual cause is that its folder is not on `PATH`.
+</Callout>
+
+## Linux fundamentals for AI work
+
+Models are trained and served on Linux, almost always. Even if your laptop is a Mac, your containers, cloud GPUs and CI runners are not.
+
+### How is the Linux filesystem laid out?
+
+Everything hangs off a single root, `/`. There are no drive letters. The directories you will meet most:
+
+| Path | What lives there |
+| --- | --- |
+| `/home/you` | Your files (`~`) |
+| `/etc` | System configuration |
+| `/var/log` | Logs |
+| `/tmp` | Scratch space, usually cleared on reboot |
+| `/usr/bin`, `/usr/local/bin` | Installed programs |
+| `/dev/shm` | Shared memory. PyTorch dataloaders can run out of it inside containers |
+
+### How do Linux file permissions work?
+
+Run `ls -l` and you see something like `-rwxr-xr--`. The first character is the type, then three triplets for the owner, the group, and everyone else. Each triplet is read (`r`), write (`w`) and execute (`x`).
+
+```bash title="terminal"
+chmod +x run.sh               # make a script executable
+chmod 600 ~/.ssh/id_ed25519   # private key: only you can read or write
+chmod 755 deploy.sh           # owner rwx, everyone else r-x
+```
+
+The numbers are sums: read is 4, write is 2, execute is 1. So 755 means `rwx r-x r-x`. Avoid `chmod 777`. It makes the error go away by removing the protection.
+
+### How do I find and stop processes?
+
+```bash title="terminal"
+ps aux | grep python     # find a running process
+top                      # live view (htop is nicer if installed); q to quit
+kill 12345               # ask politely (SIGTERM)
+kill -9 12345            # force (SIGKILL), last resort
+lsof -i :8000            # what is using port 8000?
+nvidia-smi               # GPU usage, on machines with NVIDIA GPUs
+```
+
+To keep a job running after you disconnect, use `tmux`, which gives you sessions you can detach from and reattach to. Start one with `tmux new -s train`, detach with `Ctrl-b` then `d`, and come back with `tmux attach -t train`.
+
+### How does SSH work?
+
+SSH gives you a shell on another machine. Key-based login is safer than passwords.
+
+```bash title="terminal"
+ssh-keygen -t ed25519 -C "you@example.com"   # creates ~/.ssh/id_ed25519 and .pub
+ssh-copy-id user@203.0.113.10                # install your public key on the server
+ssh user@203.0.113.10                        # log in
+scp model.bin user@203.0.113.10:/data/       # copy a file over
+```
+
+You can share the `.pub` file freely. The private key never leaves your machine. The same kind of key pair is what GitHub uses when you clone over SSH.
+
+## Git: the daily workflow and how to undo mistakes
+
+Git records snapshots of your project so you can go back, compare and collaborate. Experiments make this more valuable, not less: you will try ten ideas and want to keep three.
+
+### The daily loop
+
+```bash title="terminal"
+git clone git@github.com:you/project.git
+git switch -c feature/add-retriever     # new branch
+# ...edit files...
+git status                              # what changed
+git diff                                # exactly what changed
+git add src/retriever.py                # stage specific files
+git commit -m "Add BM25 retriever"
+git push -u origin feature/add-retriever
+```
+
+Stage files by name rather than `git add .` when you can. It stops you from committing a stray notebook output or a secrets file.
+
+### Branching
+
+A branch is a movable label on a line of commits. Keep `main` working, do new work on a branch, and merge through a pull request.
+
+```bash title="terminal"
+git switch main
+git pull
+git switch feature/add-retriever
+git rebase main        # replay your commits on top of the latest main
+```
+
+Rebase rewrites your branch's commits, so only do it on a branch nobody else is working on.
+
+### How do I undo a mistake in git?
+
+The right command depends on how far the mistake has travelled.
+
+```bash title="terminal"
+git restore src/app.py            # discard unstaged edits to a file
+git restore --staged src/app.py   # unstage, keep the edits
+git commit --amend                # fix the last commit (message or content), before pushing
+git revert abc1234                # new commit that undoes abc1234; safe for pushed work
+git reset --hard HEAD~1           # delete the last commit AND its changes; local only
+git reflog                        # list where HEAD has been; recover "lost" commits
+```
+
+Rule of thumb: if the commit is already pushed and others may have it, use `revert`. If it is only on your machine, `reset` or `amend` is fine. `git reflog` is the safety net, because commits you "lost" usually still exist there for a while.
+
+### .gitignore
+
+Create it on day one:
+
+```text title=".gitignore"
+.venv/
+__pycache__/
+.env
+*.pt
+data/raw/
+.ipynb_checkpoints/
+```
+
+If a secret was already committed, deleting the file is not enough, since it remains in history. Rotate the key at the provider first. Cleaning history comes second.
+
+## Python environments: uv, venv, pinning and secrets
+
+A virtual environment is a private folder of packages for one project. Without it, project A's library upgrade breaks project B, and "works on my machine" becomes your life.
+
+### Which Python environment tool should I use?
+
+The built-in `venv` works everywhere. [uv](https://docs.astral.sh/uv/) is a fast tool from Astral that manages Python versions, environments and dependencies in one place. I reach for uv on new projects.
+
+```bash title="terminal"
+# built-in venv
+python3 -m venv .venv
+source .venv/bin/activate
+pip install numpy pandas
+pip freeze > requirements.txt
+
+# uv
+uv init my-project && cd my-project
+uv add numpy pandas              # records deps in pyproject.toml, writes uv.lock
+uv run python main.py            # runs inside the project environment
+uv sync                          # recreate the environment from the lockfile
+```
+
+### Why pin dependencies?
+
+ML libraries move quickly and break each other. Pinning means recording exact versions so a fresh install gives the same result. With uv, the `uv.lock` file does this and you commit it. With pip, a `requirements.txt` made by `pip freeze` does it. Pin the Python version too (uv writes a `.python-version` file).
+
+### How do I keep API keys out of my code?
+
+Put them in a git-ignored dotenv file named `.env`, and load it at startup. Never hard-code a key.
+
+```bash title=".env"
+OPENAI_API_KEY=sk-your-key-here
+DATABASE_URL=postgresql://user:pass@localhost:5432/app
+```
+
+```python title="settings.py"
+import os
+from dotenv import load_dotenv   # uv add python-dotenv
+
+load_dotenv()
+api_key = os.environ["OPENAI_API_KEY"]   # raises KeyError if missing, which is what you want
+```
+
+Commit a `.env.example` with the variable names and fake values so teammates know what to set. Never paste real keys into chats, notebooks or screenshots.
+
+## Docker for AI projects
+
+Docker packages your app and everything it needs so it runs the same on your laptop, a teammate's machine and a server.
+
+### What is the difference between a Docker image and a container?
+
+An image is a read-only template: the OS layers, your Python, your dependencies and your code. A container is a running instance of an image. You can start many containers from one image, the way you can run many processes from one program.
+
+### A minimal Dockerfile for a Python service
+
+```dockerfile title="Dockerfile"
+FROM python:3.12-slim
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+Copy `requirements.txt` and install before copying the rest of the code. Docker caches each layer, so code edits do not reinstall every dependency.
+
+```bash title="terminal"
+docker build -t my-api .
+docker run --rm -p 8000:8000 --env-file .env my-api
+docker ps                   # running containers
+docker logs -f <container>  # follow logs
+```
+
+### Docker Compose for multi-service apps
+
+Most real AI apps are several services: an API, a database, a vector store, a cache. Compose describes them in one file.
+
+```yaml title="compose.yaml"
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    depends_on: [db, qdrant]
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: example
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+  qdrant:
+    image: qdrant/qdrant
+    ports: ["6333:6333"]
+volumes:
+  pgdata:
+```
+
+`docker compose up --build` starts everything and `docker compose down` stops it. [NL2SQL](/projects/nl2sql), one of my projects, runs FastAPI, PostgreSQL, Qdrant and Redis together, and starting that whole stack with one command is the reason to learn Compose.
+
+### When should you use Docker?
+
+Use it to run databases and vector stores locally, to ship a service to a server, and to share a reproducible environment. Skip it for quick notebook exploration, where a plain virtual environment is faster. GPU access from containers also needs the NVIDIA Container Toolkit on the host, so check that before assuming `--gpus all` will work.
+
+## VS Code setup: the extensions that matter
+
+VS Code is the default editor for most Python and AI work. These are the extensions I would install first:
+
+- **Python** and **Pylance** (Microsoft): language support, type checking, autocomplete and go-to-definition.
+- **Ruff** (Astral): a fast linter and formatter. It replaces flake8, isort and black for most projects.
+- **Jupyter** (Microsoft): run notebooks inside the editor.
+- **GitLens**: see who changed each line and why, and browse history.
+- **Docker** (Microsoft): manage images and containers, with Dockerfile help.
+- **Error Lens**: shows errors and warnings inline on the line that caused them.
+- **A REST client**: either REST Client (`.http` files you can commit) or Thunder Client, for hitting your API without leaving the editor.
+
+Then pick the right interpreter. Open the command palette (`Cmd/Ctrl+Shift+P`), run "Python: Select Interpreter", and choose the `.venv` in your project. Most "import could not be resolved" warnings come from the wrong interpreter being selected.
+
+My own desk setup is on the [uses page](/uses).
+
+## Jupyter notebooks vs Python scripts
+
+Notebooks are for exploring: loading data, plotting, trying a prompt, inspecting a tensor. Scripts are for anything that has to run again, run on a schedule, or be imported by other code.
+
+A workable pattern is to explore in a notebook, move the code that works into a module under `src/`, and import it back into the notebook. Notebooks carry hidden state because cells can run out of order, so restart the kernel and run all cells before you trust a result. They also make messy git diffs because outputs are stored in the file, so clear outputs before committing.
+
+## Do I need a GPU for machine learning?
+
+Not to start. Calling hosted model APIs, building RAG systems and writing agents need no GPU. Small scikit-learn models and tiny neural networks train fine on a laptop CPU.
+
+You need a GPU when you train or fine-tune neural networks of any real size, or run open models locally. Your options, from cheapest to most involved:
+
+1. **Google Colab.** Free notebooks with a limited GPU allowance. The hardware and limits change and are not guaranteed, so treat it as a learning tool.
+2. **Kaggle notebooks.** Also free, with a weekly GPU quota.
+3. **Rented cloud GPUs.** Pay by the hour from providers such as RunPod, Lambda or the major clouds. Remember to shut instances down.
+
+This is where SSH, tmux and Docker pay off: you rent a machine, log in, pull your repo and run.
+
+## How much math do I need?
+
+Less than people fear. You need linear algebra, basic calculus and probability, and only specific parts of each. I put the whole thing in its own post: [The math you actually need for machine learning](/blog/math-for-machine-learning).
+
+## A recommended setup checklist
+
+If you are starting from a blank laptop, this order works:
+
+1. Install a package manager (Homebrew on macOS, `apt` on Ubuntu) and a decent terminal.
+2. Install git, set `user.name` and `user.email`, and add an SSH key to GitHub.
+3. Install uv and create a project with `uv init`.
+4. Install VS Code with the extensions above and select the project's `.venv` interpreter.
+5. Install Docker Desktop (or Docker Engine on Linux) and run `docker run hello-world`.
+6. Create `.gitignore` and `.env.example` before your first commit.
+7. Open a free Colab or Kaggle notebook so you know where your GPU time comes from.
+
+## Key takeaways
+
+- The shell, pipes and environment variables cover most of what you do in a terminal.
+- On Linux, learn the filesystem layout, permissions, `ps` and `kill`, tmux and SSH keys.
+- Use branches, stage files deliberately, and know `restore`, `revert`, `reset` and `reflog`.
+- One virtual environment per project, pinned versions, and secrets in a git-ignored dotenv file.
+- A Docker image is the template, a container is the running copy, and Compose runs the whole stack.
+- Explore in notebooks, ship in scripts, and skip the GPU until you actually train something.
+
+## FAQ
+
+### Do I need Linux to do AI engineering?
+
+No, but you need to be comfortable with it. macOS shares most commands, and on Windows you can use WSL2 to get a real Linux shell. Servers and containers will be Linux either way.
+
+### Should I use uv, pip or conda?
+
+For new Python projects I use uv because it handles Python versions, environments and lockfiles together and is fast. pip with `venv` is fine and universal. Conda still helps when you need non-Python binary dependencies.
+
+### Is Docker required for machine learning?
+
+Not for learning. It becomes valuable once your project has more than one service or needs to run on a server. Start with a virtual environment and add Docker when you deploy.
+
+### What should I learn after the tooling?
+
+The math, then prompting and context. Start with [the math for machine learning](/blog/math-for-machine-learning), then move to [prompt engineering](/blog/prompt-engineering). You can see how these tools fit together in my [projects](/projects).

@@ -1,0 +1,302 @@
+---
+title: "Math for Machine Learning: What You Actually Need"
+summary: "The linear algebra, calculus and probability that machine learning uses, with short NumPy examples, what to skip, and a study order with free resources."
+date: 2026-09-19
+type: tutorial
+tags: [machine-learning, math, linear-algebra, probability]
+---
+
+The math you need for machine learning is three topics used in specific ways: linear algebra to represent data and layers, calculus to train models with gradients, and probability to reason about uncertainty and loss. You do not need a full degree. You need to be fluent in about a dozen ideas, and this post lists them with code you can run.
+
+This is post two in a series. The [first post](/blog/ai-engineering-toolkit) covers the tooling, so if you want to run the NumPy snippets below, set that up first. The later posts on [prompt engineering](/blog/prompt-engineering), [RAG](/blog/rag-explained) and [advanced RAG](/blog/advanced-rag) lean on the ideas here, especially vectors and similarity.
+
+All the snippets use NumPy. Install it with `uv add numpy` or `pip install numpy`.
+
+## Linear algebra: vectors, matrices and layers
+
+Linear algebra is the language of ML data. An image, a sentence embedding and a row of a spreadsheet all become lists of numbers.
+
+### What is a vector, and why do embeddings use them?
+
+A vector is an ordered list of numbers. You can read it as a point in space or as an arrow from the origin. An embedding model turns a piece of text into a vector, typically hundreds or thousands of numbers long, so that texts with similar meaning land near each other.
+
+```python title="vectors.py"
+import numpy as np
+
+a = np.array([1.0, 2.0, 3.0])
+b = np.array([2.0, 0.0, 1.0])
+
+print(a + b)          # [3. 2. 4.]
+print(2 * a)          # [2. 4. 6.]
+print(np.linalg.norm(a))   # length of a: sqrt(1 + 4 + 9) = 3.7416...
+```
+
+### What is the dot product, and how does cosine similarity work?
+
+The dot product multiplies two vectors element by element and sums the results. Geometrically, it is large and positive when the vectors point the same way, zero when they are perpendicular, and negative when they point apart.
+
+Cosine similarity divides the dot product by the two lengths, so it measures only the angle between vectors and ignores magnitude. It runs from -1 to 1. This is the standard way to compare embeddings in search and RAG.
+
+```python title="cosine.py"
+import numpy as np
+
+def cosine(u, v):
+    return np.dot(u, v) / (np.linalg.norm(u) * np.linalg.norm(v))
+
+a = np.array([1.0, 2.0, 3.0])
+b = np.array([2.0, 0.0, 1.0])
+
+print(np.dot(a, b))     # 1*2 + 2*0 + 3*1 = 5.0
+print(cosine(a, b))     # about 0.5976
+print(cosine(a, 10*a))  # 1.0, scaling doesn't change direction
+```
+
+Many embedding models return vectors that are already normalised to length 1. For those, the dot product and cosine similarity are the same number, which is why vector databases often just use the dot product. I lean on this whenever I build retrieval, as in [NL2SQL](/projects/nl2sql), where schema context is found by similarity search.
+
+### What is a matrix, and why is matrix multiplication a neural network layer?
+
+A matrix is a grid of numbers. Multiplying a matrix by a vector produces a new vector, where each output number is a dot product of one matrix row with the input. A neural network layer does exactly that, then adds a bias and applies a nonlinearity:
+
+`output = activation(W @ x + b)`
+
+```python title="layer.py"
+import numpy as np
+
+x = np.array([1.0, 2.0, 3.0])        # input with 3 features
+W = np.array([[0.2, 0.1, 0.0],
+              [0.5, -0.3, 0.8]])     # shape (2, 3): maps 3 features to 2 outputs
+b = np.array([0.1, -0.2])
+
+z = W @ x + b
+print(z)                             # [0.5 2.1]
+
+out = np.maximum(0, z)               # ReLU: keep positives, zero the negatives
+print(out)
+```
+
+The shape rule matters daily: a matrix of shape `(m, n)` times a vector of shape `(n,)` gives shape `(m,)`. Most shape errors in PyTorch are this rule being broken. Stack many inputs as rows of a matrix `X` with shape `(batch, 3)` and `X @ W.T` processes the whole batch at once, which is why GPUs, which are very fast at matrix multiplication, train networks so well.
+
+### What are eigenvectors and SVD, intuitively?
+
+A matrix transforms space by stretching, rotating and shearing it. An eigenvector is a direction the matrix only stretches, never turns, and the eigenvalue is the stretch factor.
+
+Singular value decomposition (SVD) generalises this to any matrix. It factors a matrix into rotate, stretch along axes, rotate again, and the singular values tell you how much each direction matters. Keeping only the largest ones gives the best low-rank approximation.
+
+```python title="svd.py"
+import numpy as np
+
+M = np.array([[3.0, 1.0],
+              [1.0, 3.0]])
+
+vals, vecs = np.linalg.eig(M)
+print(vals)             # eigenvalues 4 and 2 (order may vary)
+
+U, S, Vt = np.linalg.svd(M)
+print(S)                # [4. 2.]
+```
+
+You will meet this in PCA (dimensionality reduction), in the low-rank idea behind LoRA fine-tuning, and in recommenders. For most engineering work, the intuition is enough: SVD finds the directions that carry the most information and lets you drop the rest.
+
+## Calculus: derivatives, gradients and backpropagation
+
+Calculus answers one question for ML: if I nudge this number, how much does the loss change?
+
+### What is a derivative?
+
+A derivative is the slope of a function at a point, the rate of change. If `f(x) = x²`, then `f'(x) = 2x`. At `x = 3` the slope is 6, so a tiny step to the right raises `f` by about 6 times the step.
+
+You can check any derivative numerically, which is a useful habit:
+
+```python title="derivative.py"
+def f(x):
+    return x ** 2
+
+x, h = 3.0, 1e-6
+print((f(x + h) - f(x - h)) / (2 * h))   # about 6.0
+```
+
+### What is the chain rule?
+
+The chain rule says that for composed functions, you multiply the derivatives. If `y = f(g(x))`, then `dy/dx = f'(g(x)) * g'(x)`.
+
+A neural network is a long composition: layer after layer after loss. The chain rule is how you get the effect of an early weight on the final loss, by multiplying the local slopes along the path.
+
+### What is a gradient?
+
+When a function has many inputs, the gradient is the vector of partial derivatives, one per input. It points in the direction of steepest increase. To reduce the loss, step the opposite way.
+
+### How does gradient descent work?
+
+Gradient descent repeats three steps: compute the gradient of the loss with respect to the parameters, take a small step against it, and repeat. The step size is the learning rate. Here is the whole idea, fitting a line `y = w*x` to data:
+
+```python title="gradient_descent.py"
+import numpy as np
+
+x = np.array([1.0, 2.0, 3.0, 4.0])
+y = np.array([2.0, 4.0, 6.0, 8.0])    # true relationship: y = 2x
+
+w = 0.0
+lr = 0.01
+
+for step in range(200):
+    pred = w * x
+    loss = np.mean((pred - y) ** 2)            # mean squared error
+    grad = np.mean(2 * (pred - y) * x)         # d(loss)/dw, by the chain rule
+    w -= lr * grad
+
+print(round(w, 4))   # very close to 2.0
+```
+
+If the learning rate is too large, the loss bounces or explodes. If it is too small, training crawls. Tuning it is the first thing to try when training misbehaves.
+
+### What is backpropagation, intuitively?
+
+Backpropagation is the chain rule applied efficiently. You run the network forward and store the intermediate values, then walk backward from the loss, passing each layer the gradient of the loss with respect to its output. Each layer multiplies by its own local derivative and hands the result back.
+
+You will almost never code this by hand. PyTorch's autograd does it for you:
+
+```python title="autograd.py"
+import torch
+
+w = torch.tensor(0.0, requires_grad=True)
+x = torch.tensor([1.0, 2.0, 3.0, 4.0])
+y = torch.tensor([2.0, 4.0, 6.0, 8.0])
+
+loss = ((w * x - y) ** 2).mean()
+loss.backward()
+print(w.grad)    # tensor(-30.), matches the formula in the NumPy version
+```
+
+Understanding why `loss.backward()` works, and why gradients can vanish or explode in deep networks, is the point of learning this.
+
+## Probability and statistics
+
+Models are uncertain and data is noisy. Probability is the vocabulary for both.
+
+### What are the distributions that matter?
+
+You need a few:
+
+- **Bernoulli and binomial.** A yes/no event, and the count of yeses in repeated trials. Classification outputs are Bernoulli-shaped.
+- **Categorical.** One outcome from many classes. The output of a language model's next-token step is a categorical distribution over the vocabulary.
+- **Normal (Gaussian).** The bell curve, defined by a mean and a standard deviation. It shows up in noise, weight initialisation and many assumptions.
+- **Uniform.** Every outcome equally likely. Useful for random sampling and initialisation.
+
+### What are expectation and variance?
+
+Expectation is the probability-weighted average of a quantity, the mean you would see over many repeats. Variance is the expected squared distance from the mean, and its square root is the standard deviation. Training loss is an expectation over your data, which is why we average it over batches.
+
+```python title="stats.py"
+import numpy as np
+
+rng = np.random.default_rng(0)
+samples = rng.normal(loc=5.0, scale=2.0, size=100_000)
+
+print(samples.mean())   # close to 5
+print(samples.std())    # close to 2
+```
+
+### What is Bayes' theorem?
+
+Bayes' theorem updates a belief when you see evidence:
+
+`P(A | B) = P(B | A) * P(A) / P(B)`
+
+A worked example. A test detects a condition 90% of the time when it is present, and gives a false positive 5% of the time when it is absent. The condition affects 1% of people. You test positive. What is the chance you have it?
+
+```python title="bayes.py"
+p_cond = 0.01
+p_pos_given_cond = 0.90
+p_pos_given_no = 0.05
+
+p_pos = p_pos_given_cond * p_cond + p_pos_given_no * (1 - p_cond)
+posterior = p_pos_given_cond * p_cond / p_pos
+print(round(posterior, 3))   # 0.154
+```
+
+About 15%, not 90%, because the condition is rare. The same reasoning shows up in spam filters, in judging an evaluation metric when classes are imbalanced, and in how you interpret a classifier's confidence.
+
+### What is maximum likelihood estimation?
+
+Maximum likelihood estimation (MLE) picks the parameters that make the observed data most probable. For many models, minimising the usual loss is the same as maximising likelihood. Mean squared error corresponds to assuming Gaussian noise, and cross-entropy corresponds to a categorical model. So when you train a classifier, you are doing MLE, whether or not you call it that.
+
+### What are softmax and cross-entropy?
+
+A network's final layer produces raw scores called logits. Softmax turns them into probabilities that are positive and sum to 1:
+
+`softmax(z)_i = exp(z_i) / sum_j exp(z_j)`
+
+Cross-entropy then measures how well those probabilities match the true label. For a single example with correct class `c`, the loss is `-log(p_c)`. It is small when the model gives the right class high probability and grows sharply when it is confidently wrong.
+
+```python title="softmax_ce.py"
+import numpy as np
+
+def softmax(z):
+    z = z - np.max(z)            # subtract max for numerical stability
+    e = np.exp(z)
+    return e / e.sum()
+
+logits = np.array([2.0, 1.0, 0.1])
+p = softmax(logits)
+print(p)                          # about [0.659 0.242 0.099]
+print(p.sum())                    # 1.0
+
+true_class = 0
+loss = -np.log(p[true_class])
+print(round(loss, 4))             # about 0.4170
+```
+
+The same softmax is behind temperature in language model sampling: dividing the logits by a temperature before softmax flattens or sharpens the distribution. It also explains attention weights in transformers, which are a softmax over similarity scores.
+
+## What math can you skip?
+
+For applied ML and AI engineering, you can defer these until a specific need appears:
+
+- Proofs, real analysis and measure theory.
+- Heavy multivariable integration. You mostly need derivatives, not integrals.
+- Advanced optimisation theory (convex duality, second-order methods) beyond knowing what Adam and momentum do at a high level.
+- Differential equations, unless you work on specific areas such as diffusion models.
+- Abstract linear algebra such as vector spaces over general fields, and manual determinant or inverse calculations.
+
+If you work mainly with LLM APIs and RAG, the minimum is vectors, dot product, cosine similarity, and a feel for probability and softmax. Add calculus when you start training.
+
+## What order should you study the math in?
+
+Interleave it with code rather than finishing a textbook first.
+
+1. **Vectors, dot products and matrices.** 3Blue1Brown's "Essence of Linear Algebra" video series is the best visual intuition available, and it is free on YouTube. Practise in NumPy.
+2. **Derivatives, the chain rule and gradients.** 3Blue1Brown's "Essence of Calculus" series, then Khan Academy's calculus and multivariable calculus courses for practice problems.
+3. **Gradient descent and backprop.** 3Blue1Brown's neural networks series (the "But what is a neural network?" chapters) walks through exactly this. Then reimplement the NumPy example above on a different function.
+4. **Probability and statistics.** Khan Academy's statistics and probability course, and StatQuest with Josh Starmer on YouTube for clear explanations of distributions, MLE and cross-entropy.
+5. **Consolidate.** The free book *Mathematics for Machine Learning* by Deisenroth, Faisal and Ong, available as a PDF at mml-book.com, ties the three areas together. Read it as a reference, not cover to cover.
+
+Pair each step with code. Fitting a line by gradient descent and building a tiny classifier with softmax will teach more than another week of notes.
+
+## Quick checklist
+
+- Can you explain a dot product and compute cosine similarity in NumPy?
+- Can you predict the output shape of a matrix times a vector?
+- Can you explain, in one sentence, what a gradient and the learning rate do?
+- Can you describe backpropagation as the chain rule applied layer by layer?
+- Can you work through a Bayes example without a calculator panic?
+- Can you write softmax and cross-entropy from memory?
+
+If you can say yes to those, you have enough math to start building. The next step in the series is prompting: [prompt engineering](/blog/prompt-engineering). If your environment is not ready, go back to [the AI engineer's starter kit](/blog/ai-engineering-toolkit).
+
+## FAQ
+
+### How much math do I need for machine learning?
+
+For applied work: vectors and matrices, dot products, derivatives and the chain rule, gradient descent, basic probability, Bayes' theorem, softmax and cross-entropy. For research you need much more. For building products on top of LLM APIs, you need less.
+
+### Do I need to learn calculus before using PyTorch?
+
+No. You can train models with autograd without deriving anything. But knowing what a gradient and learning rate are makes debugging training far easier, so learn the basics alongside your first model.
+
+### Is cosine similarity the same as the dot product?
+
+Only when the vectors have length 1. Cosine similarity divides out the lengths. Many embedding models output normalised vectors, so in practice the two give identical rankings.
+
+### What is the best free resource to start with?
+
+3Blue1Brown's Essence of Linear Algebra and neural network videos for intuition, Khan Academy for practice problems, and the free *Mathematics for Machine Learning* book as a reference. Check my [projects](/projects) to see where this math ends up in real systems.

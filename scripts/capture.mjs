@@ -7,7 +7,7 @@ const out = ".impeccable/review/final";
 mkdirSync(out, { recursive: true });
 
 const pages = [
-  "/", "/projects", "/projects/mcpforge", "/projects/tweetmind", "/blog", "/blog/what-breaks-when-agents-call-real-apis",
+  "/", "/projects", "/projects/mcpforge", "/projects/tweetmind", "/blog", "/blog/ai-engineering-toolkit",
   "/posts", "/life", "/play", "/guestbook", "/uses", "/not-a-page",
 ];
 const browser = await chromium.launch();
