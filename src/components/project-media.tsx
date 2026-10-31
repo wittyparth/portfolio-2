@@ -97,8 +97,8 @@ function Gallery({
               )}
               className="flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 font-mono text-[11px] text-white tabular-nums backdrop-blur"
             />
-            {/* Dots stay 6px to look; each button reaches 24px through ::after so it is easy to hit. */}
-            <CarouselDots className="pointer-events-auto flex items-center !gap-2 rounded-full bg-black/55 px-3 py-2 text-white backdrop-blur [&_button]:relative [&_button]:!size-1.5 [&_button]:after:absolute [&_button]:after:-inset-[9px] [&_button]:after:content-['']" />
+            {/* Dots stay 6px to look; 18px gaps keep them 24px apart (WCAG target spacing) and ::after widens each hit area. */}
+            <CarouselDots className="pointer-events-auto flex items-center !gap-[18px] rounded-full bg-black/55 px-3 py-2 text-white backdrop-blur [&_button]:relative [&_button]:!size-1.5 [&_button]:after:absolute [&_button]:after:-inset-[9px] [&_button]:after:content-['']" />
           </div>
         </>
       )}

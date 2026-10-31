@@ -253,7 +253,7 @@ export function AgentGraph({ weather }: { weather: Weather | null }) {
               key={n}
               layout={!reduce}
               initial={reduce ? false : { opacity: 0, y: 10, filter: "blur(3px)" }}
-              animate={{ opacity: age === 0 ? 1 : age === 1 ? 0.55 : 0.28, y: 0, filter: "blur(0px)" }}
+              animate={{ opacity: age === 0 ? 1 : age === 1 ? 0.75 : 0.55, y: 0, filter: "blur(0px)" }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
               className="flex min-w-0 gap-2.5"
