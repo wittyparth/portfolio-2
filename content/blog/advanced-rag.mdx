@@ -1,0 +1,261 @@
+---
+title: "Advanced RAG: hybrid search, reranking, agents"
+summary: "Advanced RAG techniques that fix real retrieval failures: hybrid search with RRF, cross-encoder reranking, query rewriting, agentic retrieval and text-to-SQL."
+date: 2026-10-24
+type: tutorial
+tags: [rag, hybrid-search, reranking, agents]
+pinned: false
+placeholder: false
+---
+
+Advanced RAG is the set of techniques you add when a basic embed-and-search pipeline retrieves the wrong chunks: hybrid search to catch exact terms, a reranker to sort the shortlist, query rewriting to fix bad questions, metadata filters to narrow scope, and agentic retrieval to let the model decide what to look up. Add them one at a time, driven by a measured failure, not as a checklist.
+
+This post assumes you have the basics from [RAG explained](/blog/rag-explained): load, chunk, embed, store, retrieve, generate, plus a small test set with recall@k and MRR. Without that test set, none of what follows can be justified.
+
+## Why does basic RAG fail?
+
+Dense retrieval embeds the question and finds nearby vectors. That is strong on meaning and weak in predictable places:
+
+- **Exact tokens.** Error codes, product SKUs, function names and people's names have little "meaning" to embed. A query for `ERR_4021` may retrieve chunks about errors in general.
+- **Ranking.** The right chunk is in the top 50 but not the top 5.
+- **Bad queries.** Users write vague, multi-part or conversational questions ("what about the other plan?") that do not resemble any document.
+- **Scope.** The answer exists, but in the wrong product version, region or tenant.
+- **Chunk context.** A chunk retrieved alone is missing the surrounding text that explains it.
+- **Questions that are not retrieval at all.** "How many orders failed last week?" needs a query, not a paragraph.
+
+Each section below maps to one of these. A decision table at the end puts them together.
+
+## What is hybrid search in RAG?
+
+Hybrid search runs a keyword search and a dense vector search, then merges the two ranked lists. The keyword side is usually BM25, a ranking function that scores documents by term frequency, term rarity and document length. It is good at exactly what embeddings are bad at, rare literal tokens. Dense search covers paraphrase and synonyms. Each covers the other's blind spot.
+
+### Reciprocal rank fusion
+
+The two retrievers produce scores on different scales, so you cannot just add them. Reciprocal rank fusion (RRF), from Cormack, Clarke and Buettcher (2009), ignores scores and uses only ranks. Each document gets, for every list it appears in:
+
+```text
+score(d) = sum over lists of 1 / (k + rank_in_list(d))
+```
+
+with k a constant, commonly 60. Documents ranked high in either list rise, and documents ranked high in both rise most. It needs no tuning of score weights, which is why it is a sensible default.
+
+```python title="hybrid.py"
+from rank_bm25 import BM25Okapi   # pip install rank-bm25
+
+def rrf(rankings: list[list[str]], k: int = 60) -> list[str]:
+    scores: dict[str, float] = {}
+    for ranking in rankings:
+        for rank, doc_id in enumerate(ranking, start=1):
+            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank)
+    return sorted(scores, key=scores.get, reverse=True)
+
+# keyword side (toy example: whitespace tokenisation)
+docs = {"a": "reset error ERR_4021 on login", "b": "how to rotate API keys", "c": "login troubleshooting guide"}
+ids = list(docs)
+bm25 = BM25Okapi([docs[i].lower().split() for i in ids])
+
+def bm25_rank(query: str, n: int = 50) -> list[str]:
+    scores = bm25.get_scores(query.lower().split())
+    return [ids[i] for i in sorted(range(len(ids)), key=lambda i: -scores[i])[:n]]
+
+# dense_rank(query) is your vector search from the previous post, returning ids
+# merged = rrf([bm25_rank(q), dense_rank(q)])[:20]
+```
+
+You do not have to build it by hand. Qdrant supports hybrid queries with prefetch plus a fusion step including RRF, and in Postgres you can combine pgvector with full-text search (`tsvector`) and fuse the results yourself. Check your database's current docs for exact syntax, since this area changes quickly.
+
+## What does a reranker do?
+
+A reranker takes the shortlist from retrieval and re-scores each candidate against the question with a more accurate, more expensive model. Retrieval casts a wide net cheaply; the reranker picks the best few.
+
+The difference is architectural. An embedding model (a bi-encoder) encodes the query and each chunk separately, so chunk vectors can be precomputed. A **cross-encoder** reads the query and the chunk together in one pass and outputs a relevance score, so it can model the interaction between them. That is more accurate and cannot be precomputed, so you only run it on tens of candidates, not millions.
+
+The usual pattern is retrieve 30 to 100, rerank, keep the top 3 to 8.
+
+```python title="rerank.py"
+from sentence_transformers import CrossEncoder  # pip install sentence-transformers
+
+reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+
+def rerank(query: str, chunks: list[str], top_n: int = 5) -> list[str]:
+    scores = reranker.predict([(query, c) for c in chunks])
+    ranked = sorted(zip(chunks, scores), key=lambda p: p[1], reverse=True)
+    return [c for c, _ in ranked[:top_n]]
+```
+
+That model is a small open one trained on a web-search passage dataset; test it on your own domain, and consider a larger open model or a hosted rerank API if quality is short. Reranking is often the single best fix when recall@50 is good and recall@5 is not.
+
+## How do you fix bad queries? Rewriting, multi-query, HyDE and decomposition
+
+Users do not write queries the way documents are written. Four techniques transform the query before retrieval.
+
+- **Query rewriting.** Have an LLM turn the raw input into a standalone search query. This matters most in chat, where "what about the pro plan?" only makes sense with history. Rewrite it to "pricing of the pro plan".
+- **Multi-query.** Generate several paraphrases of the question, retrieve for each, and fuse the results with RRF. It improves recall on ambiguous questions at the cost of extra calls.
+- **HyDE (Hypothetical Document Embeddings).** From Gao et al. (2022), "Precise Zero-Shot Dense Retrieval without Relevance Labels". Ask the model to write a plausible answer, embed that fake answer, and search with it. An answer looks more like the stored documents than a question does. The risk: if the model hallucinates a wrong premise, you retrieve for the wrong thing, so it suits topics the model broadly knows.
+- **Query decomposition.** Split a compound question into sub-questions, retrieve for each, and answer from the union. "Compare the refund policy for annual and monthly plans" becomes two lookups. For multi-hop questions, where the second lookup depends on the first answer, you need a loop, which leads to the agentic section below.
+
+```text title="rewrite prompt (sketch)"
+Given the conversation and the last user message, write one standalone search query.
+Keep names, identifiers and numbers exactly. Do not answer the question.
+Return only the query.
+```
+
+Each of these adds an LLM call before retrieval, so latency goes up. Use them where your failure analysis shows the query is the problem, which is easy to spot: the right chunk exists, and a hand-written query finds it.
+
+## Metadata filtering and self-querying
+
+Many questions contain constraints that belong in a filter, not in the embedding. "Refund policy for the EU, 2024 version" has a region and a year. Embedding those words into a vector is lossy; filtering on `region = "EU"` is exact.
+
+That only works if you stored the metadata at index time: source, version, date, region, product, tenant, document type. Vector stores such as Qdrant let you apply payload filters during the vector search itself, which is better than filtering after the fact, where a restrictive filter can leave you with too few results.
+
+**Self-querying** goes one step further. An LLM reads the user's question and the list of available metadata fields, then outputs both a semantic query and a structured filter:
+
+```json title="self-query output (sketch)"
+{
+  "query": "refund policy",
+  "filter": { "region": "EU", "year": 2024 }
+}
+```
+
+Validate that output against a schema before you run it. A model that invents a field name or value should produce an error you can handle, not a silent empty result. Frameworks like LangChain ship a self-query retriever built on this idea. Tenant and permission filters are different: those must come from your auth layer, never from the model.
+
+<Callout type="warn">
+  Never let the model choose a security filter. Apply the tenant or permission constraint in code, and let the model only add narrowing filters on top.
+</Callout>
+
+## Parent-child chunking and contextual chunk headers
+
+The chunk size trade-off from the first post has a standard workaround: **small-to-big**, also called parent-child chunking. Embed small chunks, because they match precisely. Store each with a pointer to its larger parent (the section or page). At query time, search the children, then hand the model the parent. You get precise matching and enough context to answer. LangChain exposes this as a parent document retriever. Deduplicate parents when several children from the same section match.
+
+**Contextual chunk headers** attack the same problem from the other side: make each chunk self-explanatory. Prepend the document title and heading path to every chunk before embedding, as in "Acme API > Authentication > Rotating keys". A cheaper version needs no LLM. A richer version, described by Anthropic in 2024 as "contextual retrieval", uses a model to write a short note situating each chunk within its document and prepends that to the chunk before embedding and BM25 indexing. It costs one LLM call per chunk at index time, which is paid once. Prompt caching can reduce that cost when many chunks share the same document.
+
+## GraphRAG at a high level
+
+Standard RAG retrieves passages that look similar to the question. It struggles with questions about relationships across many documents ("which teams depend on the billing service?") and with global questions ("what are the main themes in this corpus?"), because no single chunk contains the answer.
+
+GraphRAG builds a knowledge graph from the corpus: an LLM extracts entities and relations from the chunks, and the graph links them. Microsoft Research's GraphRAG (Edge et al., 2024, "From Local to Global") also clusters the graph into communities and pre-writes summaries of each, which are then used to answer corpus-wide questions. Retrieval can then follow edges, not just similarity.
+
+The cost is real: a lot of LLM calls to build the graph, a more complex pipeline, and a graph that goes stale as documents change. Reach for it when your questions are about connections or whole-corpus synthesis. For lookup-style questions, hybrid search with a reranker is simpler and usually enough.
+
+## What is agentic RAG?
+
+In agentic RAG the model decides whether to retrieve, what to search for, and when it has enough. Retrieval becomes a tool in a loop rather than a fixed step before generation.
+
+```text title="agentic retrieval loop (sketch)"
+1. Receive question
+2. Decide: answer directly, or call a tool?
+3. Tool call: search_docs(query, filters)
+4. Read results. Enough to answer? If not, rewrite the query or call another tool
+5. Stop when sufficient, or after a step budget. Answer with citations
+```
+
+What this buys you:
+
+- **Skipped retrieval** for greetings and questions the model can answer on its own.
+- **Iteration.** If the first search misses, the agent reformulates, which covers rewriting and decomposition naturally.
+- **Multi-hop answers**, where the second search depends on the first result.
+- **Multiple sources.** Separate tools for docs, a SQL database and a web search, with the model choosing between them. Good tool descriptions matter here; the choice is only as good as the descriptions it reads.
+
+What it costs: more LLM calls, higher and less predictable latency, and more ways to go wrong, such as looping or searching with a bad query again and again. Set a hard step budget, log every tool call, and keep the tool schemas tight. If a single retrieval step with good ranking answers most questions, do not add a loop for the sake of it. Exposing retrieval as an MCP or function tool is the same pattern; what makes it work or fail is the context you give the model, which is the topic of [context engineering](/blog/context-engineering).
+
+## Structured data and text-to-SQL as retrieval
+
+Some knowledge lives in tables. "Revenue by customer last quarter" has no passage to retrieve; the answer is computed. Treat the database as another retrieval source whose output is rows, and text-to-SQL as the retrieval method.
+
+My project [NL2SQL](/projects/nl2sql) is built on this idea, and it uses RAG on the way to writing the query. For each question it runs parallel vector searches over four tenant-scoped Qdrant collections: schema docs, glossary terms, past question and query pairs, and uploaded business documents. A fast model then prunes the schema to the tables and columns the question needs, and a separate generation model writes the SQL. The retrieval is over the context needed to write a good query, not over answers.
+
+A few lessons carry over to any text-to-SQL system:
+
+- **Retrieve schema, not the whole schema.** Large schemas do not fit, and irrelevant tables invite wrong joins. Embed table and column descriptions and retrieve the relevant ones.
+- **Show real values.** NL2SQL samples low-cardinality columns during introspection, so the generator knows a `status` column holds values like `'SUCCEEDED'` and `'REFUNDED'` instead of guessing.
+- **Retrieve past examples.** Question and SQL pairs that worked before are strong few-shot material.
+- **Validate before running.** The generated SQL goes through deterministic checks (a keyword blocklist, a sqlglot parse, single-statement, SELECT-only, no UNION) with errors fed back for up to three retries.
+- **Keep a person in the loop.** Nothing runs until someone approves the SQL, and it executes in a read-only transaction.
+
+Text-to-SQL is the clearest case of the agentic idea too: the system picks a source (vectors for documents, SQL for numbers) based on the question.
+
+## Caching, latency and cost
+
+Every technique above adds latency or spend. Know where it goes.
+
+| Technique | Added latency | Added cost | Where it hurts |
+|---|---|---|---|
+| Hybrid search | Small (one extra search, run in parallel) | Small | A second index to maintain |
+| Reranking | Tens to hundreds of ms for a cross-encoder, depending on candidates and hardware | Compute or API calls per query | Candidate count multiplies the cost |
+| Query rewriting, multi-query, HyDE | One or more LLM calls before retrieval | Tokens per query | Serial calls add up |
+| Contextual headers | None at query time | LLM calls at index time | Re-indexing on change |
+| GraphRAG | None at query time for local search | High at index time | Graph upkeep |
+| Agentic loop | Multiple LLM round trips | Multiplies tokens | Unpredictable worst case |
+
+Ways to claw it back:
+
+- **Cache embeddings** for repeated queries and for unchanged chunks.
+- **Cache answers** for frequent questions, keyed on the normalised question plus the index version. Invalidate on re-index.
+- **Use a small, fast model** for rewriting, routing and judging; save the large one for the final answer.
+- **Run independent steps in parallel**: dense and keyword search, or several sub-question searches.
+- **Rerank fewer candidates**, and cap context size. Fewer, better chunks also make the final generation cheaper.
+- **Stream** the answer so the user sees progress while later work finishes. NL2SQL streams each stage over server-sent events for this reason.
+- **Use prompt caching** on any stable prefix, like instructions and tool definitions, if your model provider supports it.
+
+Measure p50 and p95 latency per stage. The slowest stage is rarely the one you expect.
+
+## How do you evaluate RAG with RAGAS?
+
+RAGAS is an open-source Python framework for evaluating RAG pipelines, introduced by Es et al. (2023). Its core idea is reference-light evaluation: an LLM judge scores your pipeline's outputs, so you do not have to hand-label every answer. The metrics that matter for most teams:
+
+- **Faithfulness:** are the claims in the answer supported by the retrieved context? The answer is broken into claims and each is checked against the context.
+- **Answer relevancy:** does the answer address the question? Scored from how well the answer maps back to the original question.
+- **Context precision:** are the relevant chunks ranked toward the top of the retrieved set?
+- **Context recall:** does the retrieved context contain what is needed to produce the reference answer? This one needs a reference answer.
+
+Metric names and the library's API have changed between versions, so read the current documentation instead of copying old snippets.
+
+Use it with care. These are LLM-judged scores, so they inherit the judge's biases and noise. Treat them as a trend line across changes, not as absolute truth, and calibrate against a sample you grade by hand. Keep the cheap deterministic metrics too: recall@k and MRR against labelled chunks, which are exact and free. A sensible loop is to change one thing, rerun both sets, and keep the change only if it helps.
+
+## Which technique fixes which failure?
+
+| Symptom | Likely cause | Technique |
+|---|---|---|
+| Misses exact IDs, error codes, names | Dense embeddings blur literal tokens | Hybrid search with RRF |
+| Right chunk at rank 15, not rank 3 | Coarse first-stage ranking | Cross-encoder reranker |
+| Chat follow-ups return junk | Query depends on history | Query rewriting |
+| Vague or paraphrased question misses | Query unlike documents | Multi-query, HyDE |
+| Compound question answered half | One search cannot cover two topics | Query decomposition |
+| Answers from wrong version, region or tenant | No scoping | Metadata filters, self-querying |
+| Retrieved chunk lacks context to answer | Chunks too small or headerless | Parent-child chunks, contextual headers |
+| Questions about relationships or themes across documents | No single chunk has the answer | GraphRAG |
+| Needs several lookups or a choice of sources | Fixed one-shot pipeline | Agentic RAG with tools |
+| Question asks for a number or aggregate | Answer is computed, not stored as text | Text-to-SQL |
+| Too slow or too costly | Stacked LLM calls | Caching, smaller models, parallel steps |
+| Cannot tell if a change helped | No measurement | Labelled set, recall@k, MRR, RAGAS |
+
+Work down the table from your measured symptoms. If you cannot name the symptom, you are not ready to add the technique.
+
+## Key takeaways
+
+- Add advanced techniques only against a measured failure, using a labelled test set.
+- Hybrid search (BM25 plus dense, fused with RRF) fixes exact-term misses with little cost.
+- A cross-encoder reranker is often the best fix when the right chunk is retrieved but ranked low.
+- Rewriting, multi-query, HyDE and decomposition repair the query, at the price of extra LLM calls.
+- Filters and self-querying handle scope; security filters come from code, not the model.
+- Small-to-big chunking and contextual headers give chunks the context they lack.
+- GraphRAG suits relationship and whole-corpus questions; agentic RAG suits multi-step lookups; text-to-SQL suits numbers.
+- Budget latency and cost per stage, and cache what repeats.
+
+## FAQ
+
+### What is the difference between basic and advanced RAG?
+
+Basic RAG embeds the question and retrieves the nearest chunks once. Advanced RAG adds stages around that: keyword plus vector search, reranking, query transformation, metadata filters, richer chunking, and sometimes an agent loop. Each stage targets a specific retrieval failure.
+
+### Do I need a reranker?
+
+Often yes, if the right chunk appears in your top 30 to 50 but not your top 5. Check recall@50 against recall@5 on a labelled set. If both are low, the problem is upstream in chunking, embeddings or the query, and a reranker will not fix it.
+
+### When should I use agentic RAG instead of a fixed pipeline?
+
+Use it when questions need several lookups, a choice between sources, or retries after a miss. If a single well-ranked retrieval answers most questions, a fixed pipeline is faster, cheaper and easier to debug. Always cap the number of steps.
+
+### Is text-to-SQL a form of RAG?
+
+It is retrieval over structured data, and it commonly uses RAG itself. You retrieve schema descriptions, sample values and past examples to help the model write a correct query, then the database returns the rows. [NL2SQL](/projects/nl2sql) works this way, with SQL validation and human approval before execution.

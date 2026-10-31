@@ -1,0 +1,286 @@
+---
+title: "RAG explained: build retrieval-augmented generation"
+summary: "RAG explained for engineers: how to load, chunk, embed, store and retrieve documents, ground answers with citations, and evaluate and debug the pipeline."
+date: 2026-10-17
+type: tutorial
+tags: [rag, llm, vector-search, python]
+pinned: false
+placeholder: false
+---
+
+Retrieval-augmented generation (RAG) is a pattern where you search your own documents at question time, paste the best passages into the prompt, and have the model answer from them instead of from memory. It gives you answers grounded in your data, up to date without retraining, and traceable to a source. Most RAG systems that disappoint fail in retrieval, not in the model.
+
+This is the first of two posts. Here I cover the whole pipeline and a small working example. [Advanced RAG](/blog/advanced-rag) covers hybrid search, reranking and agentic retrieval. If you are new to the toolchain around all this, start with [the AI engineering toolkit](/blog/ai-engineering-toolkit).
+
+## What is RAG, and why use it?
+
+The term comes from Lewis et al. (2020), "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks". Their version trained the retriever and generator together. What people ship today is simpler: a search step in front of an off-the-shelf LLM call.
+
+The loop has two phases.
+
+- **Indexing (offline):** load documents, split them into chunks, turn each chunk into a vector with an embedding model, and store vectors plus metadata in a database.
+- **Querying (online):** embed the question, fetch the most similar chunks, build a prompt that contains them, and ask the model to answer using only that context.
+
+Three reasons to do it:
+
+1. **Grounding.** The model answers from text you handed it, so it has less room to invent. It can still misread the text, which is why you evaluate (more below).
+2. **Freshness.** Updating knowledge means re-indexing a document, not retraining a model.
+3. **Citations.** Every chunk carries a source, so the answer can point to where each claim came from. That is what lets a user check the answer.
+
+There is a fourth, practical one: access control. You can filter retrieval by user or tenant, which you cannot do with knowledge baked into model weights.
+
+## RAG vs fine-tuning: which should you pick?
+
+Use RAG when the problem is knowledge. Use fine-tuning when the problem is behaviour.
+
+| Question | RAG | Fine-tuning |
+|---|---|---|
+| Facts change often | Re-index the changed documents | Retrain, or live with stale facts |
+| Need citations | Natural, chunks have sources | Not available |
+| Per-user permissions | Filter at retrieval time | Cannot be enforced |
+| Need a specific tone, format or skill | Weak lever | The right tool |
+| Corpus is large and private | Fits well | Expensive and hard to update |
+| Cost to change | Cheap | Training run |
+
+They are not exclusive. A common setup is a RAG pipeline in front of a model that was tuned, or just prompted well, to follow a response format. Before you reach for either, check whether better instructions fix it; the [prompt engineering](/blog/prompt-engineering) post covers that. And if your whole corpus fits in the context window, you may not need retrieval at all, though a smaller, relevant prompt is usually cheaper and easier to debug. How to decide what goes into the window is the subject of [context engineering](/blog/context-engineering).
+
+## The RAG pipeline, step by step
+
+### Step 1: Load documents
+
+Loading is the boring step that decides your ceiling. PDFs lose table structure, HTML drags in navigation text, and slides have no prose at all. Whatever you load, keep the structure you can: headings, page numbers, URLs, section titles. You will want them as metadata later.
+
+Clean the text before chunking. Strip repeated headers and footers, fix hyphenated line breaks, and drop boilerplate that would match every query equally.
+
+### Step 2: How should you chunk documents?
+
+Chunking is where most RAG quality is won or lost. A chunk is the unit you retrieve, so it must be small enough to be specific and large enough to be understood on its own.
+
+**Size.** There is no universal right number. Start with roughly 200 to 500 tokens per chunk for prose and measure. Small chunks match narrow questions precisely but lose surrounding context. Large chunks keep context but dilute the embedding, because one vector has to represent many ideas.
+
+**Overlap.** Repeating 10 to 20 percent of the previous chunk at the start of the next one stops a sentence or an idea from being cut in half at a boundary. It costs index size and creates near-duplicate hits, so treat it as a small insurance policy, not something to crank up.
+
+**Structure-aware chunking.** Splitting every N characters ignores how documents are built. Better options:
+
+- Split on headings, then on paragraphs, then on sentences, only going smaller when a section is too big.
+- Keep code blocks, tables and lists whole.
+- Prepend the heading path (for example "Billing > Refunds") to each chunk so it carries its own context.
+- For Q&A or API docs, make one chunk per question or per endpoint.
+
+Here is a minimal splitter that respects headings in Markdown. It is plain Python with no dependencies.
+
+```python title="chunk.py"
+import re
+
+def chunk_markdown(text: str, source: str, max_chars: int = 1600, overlap: int = 200):
+    """Split on headings first, then pack paragraphs up to max_chars."""
+    chunks = []
+    # split just before every heading line, keeping the heading with its body
+    sections = re.split(r"(?m)^(?=#{1,3} )", text)
+    for section in sections:
+        section = section.strip()
+        if not section:
+            continue
+        title = section.splitlines()[0].lstrip("# ").strip()
+        buf = ""
+        for para in section.split("\n\n"):
+            if buf and len(buf) + len(para) > max_chars:
+                chunks.append({"text": buf, "source": source, "section": title})
+                buf = buf[-overlap:] + "\n\n" + para  # carry a tail forward as overlap
+            else:
+                buf = f"{buf}\n\n{para}" if buf else para
+        if buf:
+            chunks.append({"text": buf, "source": source, "section": title})
+    return chunks
+```
+
+The character budget is a rough stand-in for tokens. Swap in a real tokenizer once you care about exact limits.
+
+### Step 3: Choose an embedding model
+
+An embedding model maps text to a vector so that similar meaning lands close together. Retrieval then becomes nearest-neighbour search, usually ranked by cosine similarity. If the maths of that is fuzzy, [math for machine learning](/blog/math-for-machine-learning) walks through it.
+
+Choices that matter more than the model's leaderboard rank:
+
+- **Use the same model for documents and queries.** Vectors from different models are not comparable.
+- **Check the language and domain.** A model trained mostly on English web text may be poor on code, legal text or another language. Test on your own data.
+- **Check the dimension and the token limit.** Higher dimensions cost more storage; a chunk longer than the model's input limit is silently truncated by some providers.
+- **Some models want a prefix** such as a "query:" or "passage:" instruction. The model card says so; skipping it quietly hurts quality.
+- **Record the model name** in your index metadata. Changing it means re-embedding everything.
+
+### Step 4: Store vectors in a vector database
+
+You need somewhere to keep vectors and run approximate nearest-neighbour search, plus filter by metadata.
+
+| Store | Good for | Trade-off |
+|---|---|---|
+| **Qdrant** | Dedicated vector search with rich payload filtering, runs locally or as a service | Another service to operate |
+| **pgvector** | You already run Postgres and want vectors next to relational data and transactions | Tuning and scale limits arrive sooner than in a dedicated engine |
+| **Chroma** | Prototypes and local development, very small setup | Less suited to heavy production workloads |
+
+For a first build, pick whichever you can run today. The pipeline above and below does not change much between them. I would only move away from pgvector when filtering or scale becomes the bottleneck, and not before.
+
+Always store a payload with each vector: source, section, URL, page, document version, and anything you will filter on such as tenant or language.
+
+### Step 5: Retrieve the top-k chunks
+
+At query time, embed the question with the same model and ask for the top-k nearest chunks. Typical k is 3 to 10. Too low and you miss the answer; too high and you pay for tokens and give the model distractors.
+
+Similarity search returns the closest vectors, not the correct ones. "Closest" and "answers the question" overlap a lot, but not completely, and the gap is what the second post attacks.
+
+### Step 6: Augment the prompt and generate with citations
+
+Build a prompt that does four things: states the rules, supplies numbered context, includes the question, and tells the model what to do when the context is not enough.
+
+```text title="prompt template"
+Answer the question using only the sources below.
+Cite sources inline as [1], [2] after each claim.
+If the sources do not contain the answer, say "I don't know based on the provided documents."
+
+Sources:
+[1] (refund-policy.md, "Refunds") Refunds are issued to the original payment method within ...
+[2] (faq.md, "Billing") ...
+
+Question: How long do refunds take?
+```
+
+Numbering the sources and including the document name lets you map each `[n]` back to a real chunk and render a link. The explicit "I don't know" instruction matters: without it, the model fills gaps from memory and you lose the grounding you built the system for.
+
+## A small end-to-end example in Python
+
+Below is a working shape using Qdrant's Python client in in-memory mode. The Qdrant calls (`QdrantClient`, `create_collection`, `upsert`, `query_points`) are the real client API. The two functions `embed` and `llm` are placeholders you wire to your provider, so they are labelled as pseudo-code.
+
+```python title="rag.py"
+from qdrant_client import QdrantClient, models
+
+from chunk import chunk_markdown   # the splitter from above
+
+DIM = 768  # must match your embedding model's output size
+
+def embed(texts: list[str]) -> list[list[float]]:
+    """PSEUDO-CODE: call your embedding model here and return one vector per text."""
+    raise NotImplementedError
+
+def llm(prompt: str) -> str:
+    """PSEUDO-CODE: call your chat model here and return the answer text."""
+    raise NotImplementedError
+
+client = QdrantClient(":memory:")   # swap for QdrantClient(url=...) in real use
+client.create_collection(
+    collection_name="docs",
+    vectors_config=models.VectorParams(size=DIM, distance=models.Distance.COSINE),
+)
+
+def index(path: str, text: str):
+    chunks = chunk_markdown(text, source=path)
+    vectors = embed([f"{c['section']}\n{c['text']}" for c in chunks])
+    client.upsert(
+        collection_name="docs",
+        points=[
+            models.PointStruct(id=i, vector=v, payload=c)
+            for i, (v, c) in enumerate(zip(vectors, chunks))
+        ],
+    )
+
+def answer(question: str, k: int = 5):
+    hits = client.query_points(
+        collection_name="docs",
+        query=embed([question])[0],
+        limit=k,
+    ).points
+    context = "\n".join(
+        f"[{n}] ({h.payload['source']}, \"{h.payload['section']}\") {h.payload['text']}"
+        for n, h in enumerate(hits, start=1)
+    )
+    prompt = (
+        "Answer using only the sources below. Cite as [1], [2]. "
+        "If they do not contain the answer, say you don't know.\n\n"
+        f"Sources:\n{context}\n\nQuestion: {question}"
+    )
+    return llm(prompt), [h.payload for h in hits]
+```
+
+Two details worth copying. First, the section title is embedded together with the text, so the vector knows what the chunk is about. Second, `answer` returns the payloads alongside the text, so the UI can show real sources rather than trusting the model to format links.
+
+Two caveats. The ids here are just loop counters, so indexing a second document would overwrite the first; in production use stable ids (a hash of source plus chunk position) so re-indexing a document replaces its old chunks instead of duplicating them. And for a Postgres version, the same shape works with a `vector` column and an `ORDER BY embedding <=> query` clause using pgvector's cosine distance operator.
+
+<Callout type="tip">
+  Build a ten-question test set from your real documents before you tune anything. Every later decision, chunk size, k, embedding model, gets answered by running it, not by guessing.
+</Callout>
+
+## How do you evaluate a RAG system?
+
+Evaluate retrieval and generation separately. If you only judge the final answer, you cannot tell which half is broken.
+
+### Evaluating retrieval
+
+You need a set of questions, each labelled with the chunk or document that contains the answer. Then compute:
+
+- **Recall@k:** of the questions, what fraction have at least one correct chunk in the top k? This is the ceiling for your whole system. If the right chunk is not retrieved, the model cannot use it.
+- **MRR (mean reciprocal rank):** for each question take 1 divided by the rank of the first correct chunk, then average. First place scores 1, third place scores 0.33. It rewards putting the right chunk near the top.
+- **Precision@k:** what share of the retrieved chunks are relevant. Useful because irrelevant chunks cost tokens and distract the model.
+
+```python title="eval_retrieval.py"
+def recall_at_k(results: list[list[str]], gold: list[set[str]], k: int) -> float:
+    hits = sum(1 for r, g in zip(results, gold) if g & set(r[:k]))
+    return hits / len(gold)
+
+def mrr(results: list[list[str]], gold: list[set[str]]) -> float:
+    total = 0.0
+    for r, g in zip(results, gold):
+        for rank, doc_id in enumerate(r, start=1):
+            if doc_id in g:
+                total += 1 / rank
+                break
+    return total / len(gold)
+```
+
+### Evaluating generation
+
+Given good context, is the answer good? Two checks cover most of it:
+
+- **Faithfulness (groundedness):** is every claim in the answer supported by the retrieved context? This catches hallucination.
+- **Answer relevance:** does the answer address the question that was asked, rather than something nearby?
+
+You can grade these by hand on a small set, or use an LLM as a judge with a clear rubric. Judges are biased and inconsistent, so spot-check them against your own labels. Tools like RAGAS package these metrics; I describe them in the [advanced RAG post](/blog/advanced-rag#how-do-you-evaluate-rag-with-ragas).
+
+## Why does my RAG system give bad answers?
+
+When answers are wrong, walk this list in order. Each failure has a different fix.
+
+1. **Bad chunks.** The answer is split across two chunks, or a chunk is a table fragment with no header. Look at the raw retrieved text. If a human cannot answer from it, neither can the model. Fix with structure-aware chunking, headers and sensible overlap.
+2. **Wrong embeddings.** The model does not understand your domain or language, or you embedded queries and documents with different models or missing prefixes. Fix by testing alternatives on your labelled set, and by re-embedding after any model change.
+3. **Missing metadata.** You cannot filter by product, date or tenant, so answers come from the wrong version or the wrong customer's data. Store the fields you will need at index time; adding them later means re-indexing.
+4. **A stale index.** The source changed but the vectors did not. Track a document hash or version, re-embed on change, and delete chunks for removed documents. Without deletion, retired policies keep getting cited.
+5. **The right chunk exists but is ranked low.** Recall@50 is fine, recall@5 is not. This is a ranking problem. Hybrid search and reranking, covered in [Advanced RAG](/blog/advanced-rag), are the fix.
+6. **The model ignores or misreads context.** Retrieval is fine but the answer is not faithful. Tighten the prompt, reduce k, put the strongest chunks first, and require citations.
+
+The pattern: check retrieval first, with the real chunks in front of you. Most of the time the answer is visible right there.
+
+## Key takeaways
+
+- RAG searches your documents at question time and gives the best passages to the model, for grounding, freshness and citations.
+- Use RAG for knowledge and fine-tuning for behaviour. They combine well.
+- Chunking is the highest-leverage step: respect document structure, keep 10 to 20 percent overlap, and attach headings and metadata.
+- Use one embedding model for both documents and queries, and record which one you used.
+- Qdrant, pgvector and Chroma all work; pick what you can run now.
+- Measure retrieval (recall@k, MRR) separately from generation (faithfulness, answer relevance).
+- When it fails, inspect the retrieved chunks first.
+
+## FAQ
+
+### What is RAG in simple terms?
+
+RAG is a way to let an LLM answer from your documents. You search them for the passages related to a question, include those passages in the prompt, and ask the model to answer using only that material and cite it.
+
+### Is RAG better than fine-tuning?
+
+They solve different problems. RAG adds knowledge that changes, needs citations or needs access control. Fine-tuning changes how a model behaves, such as its format or tone. For question answering over documents, start with RAG.
+
+### What chunk size should I use for RAG?
+
+Start around 200 to 500 tokens with 10 to 20 percent overlap, split on headings and paragraphs, then measure recall@k on your own questions. The right size depends on your documents and queries, so treat any default as a starting point.
+
+### Which vector database should I use for RAG?
+
+Use what you can run today. Chroma is easy for prototypes, pgvector is a natural choice if you already use Postgres, and Qdrant is a dedicated engine with strong filtering. Switch only when you hit a concrete limit.
