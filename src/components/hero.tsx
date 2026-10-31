@@ -29,8 +29,9 @@ function Tile({ className, children, delay = 0, label }: { className?: string; c
   return (
     <motion.div
       ref={ref}
-      initial={reduce ? false : { opacity: 0, y: 14, filter: "blur(6px)" }}
-      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+      // Visible from the first paint (the intro paragraph is the LCP); only a short rise plays.
+      initial={reduce ? false : { y: 10 }}
+      animate={{ y: 0 }}
       transition={{ duration: 0.55, delay, ease: [0.22, 1, 0.36, 1] }}
       onPointerMove={(e) => {
         const r = ref.current?.getBoundingClientRect();
@@ -60,7 +61,8 @@ function RoleLine({ roles }: { roles: string[] }) {
     return () => window.clearInterval(id);
   }, [reduce, roles.length]);
   return (
-    <div className="relative mt-1.5 h-7 overflow-hidden py-0.5 text-base leading-6 text-muted-foreground" aria-label={roles.join(", ")}>
+    <div className="relative mt-1.5 h-7 overflow-hidden py-0.5 text-base leading-6 text-muted-foreground">
+      <span className="sr-only">{roles.join(", ")}</span>
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.span
           key={i}
@@ -116,16 +118,22 @@ function Fact({ icon: Icon, children, tip }: { icon: React.ComponentType<{ class
 export function Hero({ weather, streak, shipped }: { weather: Weather | null; streak: number | null; shipped: number }) {
   const presence = usePresence(weather);
   const mobile = useIsMobile();
+  // The animated contour background is decoration: start it once the page is idle, and skip it on phones.
+  const [backdrop, setBackdrop] = React.useState(false);
+  React.useEffect(() => {
+    const id = window.setTimeout(() => setBackdrop(true), 1500);
+    return () => window.clearTimeout(id);
+  }, []);
 
   return (
     <section className="relative -mt-16 overflow-hidden pt-24 pb-4 sm:pt-28">
-      <TopographyBackground
+      {backdrop && !mobile && <TopographyBackground
         aria-hidden
         levels={14}
         speed={0.5}
         peak={0.8}
         className="absolute inset-0 text-neutral-300 [mask-image:radial-gradient(ellipse_70%_60%_at_50%_35%,black,transparent)] dark:text-neutral-800"
-      />
+      />}
 
       <div className="relative mx-auto grid w-full max-w-[44rem] grid-cols-2 gap-3 px-6 sm:grid-cols-6">
         {/* Who, and what to do next */}

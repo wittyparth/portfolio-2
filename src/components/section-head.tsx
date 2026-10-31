@@ -12,7 +12,7 @@ export function SectionHead({ n, total, title, action }: { n: number; total: num
     <div className="mb-6 flex items-center gap-3">
       <span className="inline-flex h-6 items-center rounded-md border border-border bg-background px-1.5 font-mono text-[11px] text-muted-foreground tabular-nums">
         {String(n).padStart(2, "0")}
-        <span className="opacity-50">/{String(total).padStart(2, "0")}</span>
+        <span className="opacity-75">/{String(total).padStart(2, "0")}</span>
       </span>
       <h2 className="shrink-0 text-lg font-medium tracking-tight">{title}</h2>
       <motion.span

@@ -200,7 +200,7 @@ function Shelf({
             <section key={g.name} aria-label={g.category}>
               <h3 className="mb-2.5 flex items-baseline gap-2 text-sm font-medium text-foreground/80">
                 {g.category}
-                <span className="tabular-nums opacity-60">{g.items.length}</span>
+                <span className="tabular-nums">{g.items.length}</span>
               </h3>
               <ul className="flex flex-wrap gap-2">
                 {g.items.map((s) => (
@@ -273,7 +273,7 @@ export function Stack({ usedIn }: { usedIn: Record<string, { slug: string; name:
               ) : (
                 <Bars level={l} />
               )}
-              {LEVEL[l].label} <span className="tabular-nums opacity-60">{counts[l]}</span>
+              {LEVEL[l].label} <span className="tabular-nums">{counts[l]}</span>
             </span>
           ))}
         </span>

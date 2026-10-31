@@ -218,7 +218,7 @@ export function CareerLog() {
                           <span className="flex items-start gap-2 pt-0.5 text-right">
                             <span className="font-mono text-xs leading-5 text-muted-foreground tabular-nums">
                               <span className="block">{c.end ? month(c.end).split(" ")[1] : "now"}</span>
-                              {span(c) && <span className="block opacity-70">{span(c)}</span>}
+                              {span(c) && <span className="block">{span(c)}</span>}
                             </span>
                             <ChevronDown
                               size={14}
@@ -255,7 +255,7 @@ export function CareerLog() {
               <span aria-hidden className="absolute top-[10px] size-2 -translate-x-1/2 rotate-45 border border-foreground/40 bg-background" style={{ left: LANES[0] }} />
               <p className="col-start-2 px-2 py-1.5 font-mono text-xs text-muted-foreground">
                 <span className="text-amber-700 dark:text-amber-400/70">{hash(careerRoot.message)}</span>{" "}
-                {careerRoot.message} <span className="opacity-60">· {careerRoot.year}</span>
+                {careerRoot.message} <span>· {careerRoot.year}</span>
               </p>
             </div>
           </li>

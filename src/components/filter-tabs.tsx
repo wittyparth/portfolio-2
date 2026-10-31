@@ -20,6 +20,8 @@ export function FilterTabs<T extends string>({
             <TabsHighlightItem key={o.value} value={o.value}>
               <TabsTrigger
                 value={o.value}
+                // These tabs filter content elsewhere on the page; there is no tab panel to point at.
+                aria-controls={undefined}
                 className="flex min-h-7 items-center gap-1.5 px-3 py-1 whitespace-nowrap text-muted-foreground transition-colors data-[state=active]:text-foreground"
               >
                 {o.label}

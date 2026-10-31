@@ -36,7 +36,7 @@ export function Contact() {
         <FlipButton
           from="top"
           onClick={copy}
-          aria-label={`Copy email address ${profile.email}`}
+          aria-label={`Email me: copy ${profile.email}`}
           className="h-10 rounded-full text-sm font-medium"
         >
           <FlipButtonFront className="inline-flex h-10 w-40 items-center justify-center gap-2 rounded-full bg-foreground text-background">

@@ -176,7 +176,7 @@ export function Nav() {
         >
           <Link
             href="/"
-            aria-label="Home"
+            aria-label="PS, Partha Saradhi home"
             className="grid size-8 place-items-center rounded-full bg-foreground font-mono text-[11px] font-semibold tracking-tight text-background"
           >
             PS
