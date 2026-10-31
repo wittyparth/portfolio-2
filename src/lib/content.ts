@@ -36,7 +36,7 @@ export const socials = [
   { name: "GitHub", href: "https://github.com/wittyparth", icon: "github" },
   { name: "LinkedIn", href: "https://www.linkedin.com/in/partha-saradhi-munakala/", icon: "linkedin" },
   { name: "LeetCode", href: "https://leetcode.com/u/Partha_saradhi99/", icon: "leetcode" },
-  // To link X, add: { name: "X", href: "https://x.com/<handle>", icon: "x" },
+  { name: "X", href: "https://x.com/itspartha_", icon: "x" },
 ] as const;
 
 export const photos = [

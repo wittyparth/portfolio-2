@@ -8,11 +8,11 @@ import { SplittingText } from "@animate-ui/react/primitives/texts/splitting";
 import { CountingNumber } from "@animate-ui/react/primitives/texts/counting-number";
 import { AnimateIcon } from "@animate-ui/react/icons";
 import { FileText } from "@/components/animate-ui/icons/file-text";
-import { Mail } from "@/components/animate-ui/icons/mail";
 import { Rocket, Timer } from "lucide-react";
 import { TechLogo } from "./tech-logo";
 import type { Weather } from "@/lib/live";
-import { profile } from "@/lib/content";
+import { profile, socials } from "@/lib/content";
+import { BrandIcon, brandIcons } from "./brand-icon";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { PhotoStack } from "./photo-stack";
@@ -116,7 +116,6 @@ function Fact({ icon: Icon, children, tip }: { icon: React.ComponentType<{ class
 export function Hero({ weather, streak, shipped }: { weather: Weather | null; streak: number | null; shipped: number }) {
   const presence = usePresence(weather);
   const mobile = useIsMobile();
-  const [copied, setCopied] = React.useState(false);
 
   return (
     <section className="relative -mt-16 overflow-hidden pt-24 pb-4 sm:pt-28">
@@ -188,19 +187,30 @@ export function Hero({ weather, streak, shipped }: { weather: Weather | null; st
                 <FileText size={15} /> Resume
               </button>
             </AnimateIcon>
-            <AnimateIcon animateOnHover asChild>
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(profile.email);
-                  setCopied(true);
-                  window.setTimeout(() => setCopied(false), 1600);
-                }}
-                className="relative inline-flex h-9 items-center gap-2 rounded-full border border-border px-4 text-sm transition-colors hover:bg-accent"
-              >
-                <Mail size={15} /> {copied ? "Copied!" : "Copy email"}
-              </button>
-            </AnimateIcon>
+<span aria-hidden className="mx-1 h-5 w-px bg-border" />
+            {/* Profiles: monochrome at rest, each takes its own brand colour on hover. */}
+            <ul className="flex items-center gap-0.5" aria-label="Profiles">
+              {socials.map((s) => {
+                const hex = brandIcons[s.icon]?.hex;
+                const ink = !hex || ["000000", "181717", "191919"].includes(hex);
+                return (
+                  <li key={s.name}>
+                    <Tip label={s.name}>
+                      <a
+                        href={s.href}
+                        target="_blank"
+                        rel="noreferrer me"
+                        aria-label={`${s.name} (opens in a new tab)`}
+                        style={{ "--brand": ink ? "var(--foreground)" : `#${hex}` } as React.CSSProperties}
+                        className="grid size-9 place-items-center rounded-full text-muted-foreground transition-[color,background-color,translate] duration-200 hover:-translate-y-0.5 hover:bg-accent hover:text-[var(--brand)] focus-visible:text-[var(--brand)]"
+                      >
+                        <BrandIcon name={s.icon} className="size-[17px]" />
+                      </a>
+                    </Tip>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         </Tile>
 
