@@ -3,7 +3,7 @@ import { TypingGame } from "./typing-game";
 import { PageHeader } from "@/components/page-header";
 
 export const metadata: Metadata = {
-  title: "Typing test — Partha Saradhi",
+  title: "Typing test · Partha Saradhi",
   description: "A small typing speed test with a public leaderboard. 15, 30 or 60 seconds, plain words or code.",
 };
 

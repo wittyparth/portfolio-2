@@ -7,6 +7,9 @@ import { ogCard } from "@/lib/og";
 // whose generated wrapper reads params outside a Suspense boundary and trips instant-navigation validation.
 export async function GET(_req: Request, { params }: RouteContext<"/og/[kind]/[slug]">) {
   const { kind, slug } = await params;
+  if (kind === "site") {
+    return ogCard({ kicker: "AI Engineer · Lyzr AI", title: "Partha Saradhi Munakala builds AI agents that ship.", footer: "Bengaluru, India" });
+  }
   if (kind === "blog") {
     const post = getPost(slug);
     if (!post) return new Response("Not found", { status: 404 });

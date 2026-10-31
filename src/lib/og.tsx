@@ -1,12 +1,12 @@
 import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { ImageResponse } from "next/og";
 import { profile } from "./content";
 
 export const ogSize = { width: 1200, height: 630 };
 
 // Geist SemiBold (OFL) so titles match the site; the bundled default font has only one weight.
-const semibold = readFile(path.join(process.cwd(), "src/assets/Geist-SemiBold.ttf"));
+// An asset URL, so the font is bundled with the function on Vercel (a cwd-relative path is not traced).
+const semibold = readFile(new URL("../assets/Geist-SemiBold.ttf", import.meta.url));
 
 /** The share card for posts and projects: black, quiet, the title doing the work. */
 export async function ogCard({ kicker, title, footer }: { kicker: string; title: string; footer: string }) {

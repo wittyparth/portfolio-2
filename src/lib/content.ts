@@ -10,7 +10,10 @@ export const profile = {
   coords: { lat: 12.9716, lon: 77.5946 },
   github: "wittyparth",
   // TODO: set NEXT_PUBLIC_SITE_URL in Vercel to the real domain; used for RSS, share links and share images.
-  site: (process.env.NEXT_PUBLIC_SITE_URL ?? "https://partha.example.com").replace(/\/$/, ""),
+  site: (
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000")
+  ).replace(/\/$/, ""),
   email: "parthasaradhimunakala@gmail.com",
   bio: {
     lead: "I build AI agents and the backends that make them",
@@ -33,8 +36,7 @@ export const socials = [
   { name: "GitHub", href: "https://github.com/wittyparth", icon: "github" },
   { name: "LinkedIn", href: "https://www.linkedin.com/in/partha-saradhi-munakala/", icon: "linkedin" },
   { name: "LeetCode", href: "https://leetcode.com/u/Partha_saradhi99/", icon: "leetcode" },
-  // TODO: add your X profile URL, or delete this line if you don't want X linked.
-  { name: "X", href: "https://x.com/", icon: "x", placeholder: true },
+  // To link X, add: { name: "X", href: "https://x.com/<handle>", icon: "x" },
 ] as const;
 
 export const photos = [
