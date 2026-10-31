@@ -170,7 +170,7 @@ export const uses: { group: string; items: { name: string; note: string; logo?: 
     group: "Daily",
     items: [
       { name: "Notion", logo: "notion", note: "Notes, plans, half-finished ideas." },
-      { name: "Chai", glyph: "coffee", wide: true, note: "Non-negotiable after 4pm." },
+      { name: "Chai", glyph: "coffee", note: "Non-negotiable after 4pm." },
     ],
   },
 ];

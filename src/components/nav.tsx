@@ -95,10 +95,9 @@ function MobileMore({ active }: { active: boolean }) {
         <button
           type="button"
           aria-label="More pages"
-          className={`flex h-14 w-[4.25rem] flex-col items-center justify-center gap-1 text-xs outline-none data-[state=open]:text-foreground ${active ? "text-foreground" : "text-muted-foreground"}`}
+          className={`flex h-14 w-12 items-center justify-center outline-none data-[state=open]:text-foreground ${active ? "text-foreground" : "text-muted-foreground"}`}
         >
           <Ellipsis size={18} />
-          More
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="end" sideOffset={12} className="w-56 rounded-xl p-1.5">
