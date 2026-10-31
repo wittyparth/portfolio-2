@@ -191,7 +191,7 @@ export function Guestbook({
           e.preventDefault();
           void submit();
         }}
-        className="mt-10 rounded-2xl border border-border bg-card p-4 shadow-[0_1px_2px_rgb(0_0_0/0.04),0_12px_32px_-16px_rgb(0_0_0/0.18)] sm:p-5"
+        className="mt-10"
       >
         <div className="grid gap-3">
           <div>
@@ -263,8 +263,8 @@ export function Guestbook({
             {messageLength}/{MESSAGE_MAX}
           </span>
           <span className="hidden text-xs text-muted-foreground sm:inline">
-            <kbd className="rounded border border-border px-1 font-mono text-[10px]">⌘</kbd>
-            <kbd className="ml-0.5 rounded border border-border px-1 font-mono text-[10px]">↵</kbd> to send
+            <kbd className="rounded border border-border px-1 font-mono text-xs">⌘</kbd>
+            <kbd className="ml-0.5 rounded border border-border px-1 font-mono text-xs">↵</kbd> to send
           </span>
           <Button type="submit" disabled={disabled} className="ml-auto h-9 min-w-24 rounded-full px-4">
             {submitting ? (
@@ -330,23 +330,22 @@ export function Guestbook({
       <section aria-labelledby="gb-wall" className="mt-14">
         <div className="mb-5 flex items-baseline justify-between gap-4">
           <h2 id="gb-wall" className="text-lg font-medium tracking-tight">The wall</h2>
-          <span className="inline-flex items-baseline gap-1 text-sm text-muted-foreground">
-            <span className="font-mono tabular-nums text-foreground"><SlidingNumber number={total} /></span>
-            {total === 1 ? "note" : "notes"}
-          </span>
+          {total > 0 && (
+            <span className="inline-flex items-baseline gap-1 text-sm text-muted-foreground">
+              <span className="font-mono tabular-nums text-foreground"><SlidingNumber number={total} /></span>
+              {total === 1 ? "note" : "notes"}
+            </span>
+          )}
         </div>
 
-        {ephemeral && (
-          <p className="mb-4 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+        {ephemeral && process.env.NODE_ENV === "development" && (
+          <p className="mb-4 text-xs text-muted-foreground">
             Dev mode: no Upstash keys, so notes live in memory and reset when the server restarts.
           </p>
         )}
 
         {entries.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border px-6 py-14 text-center">
-            <p className="font-medium">No notes yet.</p>
-            <p className="mt-1 text-sm text-muted-foreground">The wall is empty. Be the first name on it.</p>
-          </div>
+          <p className="py-10 text-center text-[15px] text-muted-foreground">The wall is waiting for a first name. Yours would look good up here.</p>
         ) : (
           <ul className="grid items-start gap-4 sm:grid-cols-2">
             <AnimatePresence initial={false}>
@@ -364,12 +363,12 @@ export function Guestbook({
                     className="rounded-xl border border-border bg-card p-4 transition-transform duration-300 ease-out sm:rotate-[var(--tilt)] sm:hover:rotate-0"
                   >
                     <header className="mb-2 flex items-center gap-2.5">
-                      <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-[11px] font-medium text-foreground/80">
+                      <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-xs font-medium text-foreground/80">
                         {initials(e.name)}
                       </span>
                       <span className="min-w-0 truncate text-sm font-medium">{e.name}</span>
                       {mine.has(e.id) && (
-                        <span className="rounded-full bg-foreground px-1.5 py-px text-[10px] text-background">you</span>
+                        <span className="rounded-full bg-foreground px-1.5 py-px text-xs text-background">you</span>
                       )}
                       <time
                         dateTime={new Date(e.createdAt).toISOString()}

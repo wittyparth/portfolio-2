@@ -37,6 +37,12 @@ export function ResumeViewer() {
     return () => window.removeEventListener(OPEN_EVENT, onOpen);
   }, []);
 
+  const paper = React.useRef<HTMLDivElement>(null);
+  // Every open starts at the top of page one, whatever the last visit left behind.
+  React.useEffect(() => {
+    if (open) requestAnimationFrame(() => paper.current?.scrollTo({ top: 0 }));
+  }, [open]);
+
   const file = `${profile.fullName.replace(/\s+/g, "-")}-Resume.pdf`;
 
   return (
@@ -64,7 +70,7 @@ export function ResumeViewer() {
             </span>
             <p className="min-w-0 flex-1 truncate font-mono text-xs">
               Resume.pdf <span className="text-neutral-500">· {LABEL[state.status]}</span>
-              {state.pages ? <span className="text-neutral-500"> · {state.pages} {state.pages === 1 ? "page" : "pages"}</span> : null}
+              {state.pages ? <span className="text-neutral-500 max-sm:hidden"> · {state.pages} {state.pages === 1 ? "page" : "pages"}</span> : null}
             </p>
             <div className="flex items-center gap-0.5">
               <Tip label="Zoom out" side="bottom">
@@ -101,7 +107,21 @@ export function ResumeViewer() {
         </div>
 
         {/* Paper path: clipped at the slot, scrollable below it. */}
-        <div className="relative -mt-1 w-[calc(100%-2.5rem)] flex-1 overflow-auto overscroll-contain [scrollbar-width:thin]">
+        <div ref={paper} className="relative -mt-1 w-[calc(100%-2.5rem)] flex-1 overflow-auto overscroll-contain [scrollbar-width:thin]">
+          {state.status === "loading" && (
+            <div aria-hidden className="absolute inset-x-0 top-1 mx-auto aspect-[1/1.414] animate-pulse overflow-hidden bg-white p-[8%] shadow-[0_30px_60px_-25px_rgb(0_0_0/0.55)] motion-reduce:animate-none">
+              <div className="h-5 w-2/5 rounded bg-neutral-200" />
+              <div className="mt-2 h-2.5 w-3/5 rounded bg-neutral-100" />
+              {[0, 1, 2].map((b) => (
+                <div key={b} className="mt-[7%] space-y-2">
+                  <div className="h-3 w-1/4 rounded bg-neutral-200" />
+                  <div className="h-2.5 w-full rounded bg-neutral-100" />
+                  <div className="h-2.5 w-11/12 rounded bg-neutral-100" />
+                  <div className="h-2.5 w-4/5 rounded bg-neutral-100" />
+                </div>
+              ))}
+            </div>
+          )}
           <div className="flex min-w-full justify-center pt-1">
             {open && (
               <ResumePaper src={RESUME} zoom={zoom} onStatus={setState} />

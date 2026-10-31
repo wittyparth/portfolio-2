@@ -44,7 +44,7 @@ function Segmented<T extends string>({
               <TabsTrigger
                 value={o.value}
                 tabIndex={disabled ? -1 : undefined}
-                className="px-3 py-1 text-muted-foreground transition-colors data-[state=active]:text-foreground"
+                className="min-h-7 px-3 py-1 text-muted-foreground transition-colors data-[state=active]:text-foreground"
               >
                 {o.label}
               </TabsTrigger>
@@ -305,7 +305,7 @@ export function TypingGame() {
         </Tip>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8 min-h-[17.5rem]">
         <AnimatePresence mode="wait" initial={false}>
           {result ? (
             <motion.div
@@ -401,8 +401,8 @@ export function TypingGame() {
               </div>
 
               <p className="mt-6 hidden items-center gap-4 text-xs text-muted-foreground sm:flex">
-                <span><kbd className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px]">tab</kbd> new words</span>
-                <span><kbd className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px]">esc</kbd> restart</span>
+                <span><kbd className="rounded border border-border px-1.5 py-0.5 font-mono text-xs">tab</kbd> new words</span>
+                <span><kbd className="rounded border border-border px-1.5 py-0.5 font-mono text-xs">esc</kbd> restart</span>
                 {round && round.roundId === null && <span>offline round · scores won&apos;t be saved</span>}
               </p>
             </motion.div>

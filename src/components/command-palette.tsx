@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/command";
 import { Drawer, DrawerContent, DrawerTitle } from "@/components/ui/drawer";
 import { House } from "@/components/animate-ui/icons/house";
+import { Laptop } from "lucide-react";
 import { Layers } from "@/components/animate-ui/icons/layers";
 import { BookOpen } from "@/components/animate-ui/icons/book-open";
 import { FileText } from "@/components/animate-ui/icons/file-text";
@@ -45,11 +46,19 @@ function Palette({ close, index }: { close: () => void; index: SearchIndex }) {
   };
 
   const item = "gap-3 py-2.5 [&_svg]:text-muted-foreground";
+  // A soft fade at the bottom edge says "there's more below"; it goes away once the list is scrolled to the end.
+  const [more, setMore] = React.useState(true);
+  const check = (el: HTMLElement) => setMore(el.scrollHeight - el.scrollTop - el.clientHeight > 8);
 
   return (
     <>
       <CommandInput placeholder="Search projects, posts, pages…" />
-      <CommandList className="max-h-[min(26rem,60vh)]">
+      <div className="relative">
+      <CommandList
+        className="max-h-[min(26rem,60vh)]"
+        ref={(el) => { if (el) requestAnimationFrame(() => check(el)); }}
+        onScroll={(e) => check(e.currentTarget)}
+      >
         <CommandEmpty>Nothing matches. Try a project name or “email”.</CommandEmpty>
         <CommandGroup heading="Go to">
           <CommandItem className={item} onSelect={() => go("/")}><House size={16} />Home</CommandItem>
@@ -59,7 +68,7 @@ function Palette({ close, index }: { close: () => void; index: SearchIndex }) {
           <CommandItem className={item} value="off the clock life photos film" onSelect={() => go("/life")}><Camera size={16} />Off the clock</CommandItem>
           <CommandItem className={item} value="typing test play leaderboard wpm" onSelect={() => go("/play")}><Terminal size={16} />Typing test</CommandItem>
           <CommandItem className={item} value="guestbook sign note" onSelect={() => go("/guestbook")}><NotebookPen size={16} />Guestbook</CommandItem>
-          <CommandItem className={item} value="uses setup desk gear" onSelect={() => go("/uses")}><Layers size={16} />Uses</CommandItem>
+          <CommandItem className={item} value="uses setup desk gear" onSelect={() => go("/uses")}><Laptop size={16} />Uses</CommandItem>
         </CommandGroup>
         <CommandGroup heading="Projects">
           {index.projects.map((p) => (
@@ -106,6 +115,11 @@ function Palette({ close, index }: { close: () => void; index: SearchIndex }) {
           </CommandItem>
         </CommandGroup>
       </CommandList>
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-popover to-transparent transition-opacity duration-200 ${more ? "opacity-100" : "opacity-0"}`}
+      />
+      </div>
     </>
   );
 }

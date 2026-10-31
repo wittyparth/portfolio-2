@@ -26,7 +26,7 @@ function Bars({ playing }: { playing: boolean }) {
       {[0.9, 0.5, 0.75].map((h, i) => (
         <span
           key={i}
-          className={cn("w-[3px] origin-bottom rounded-[1px] bg-[#1DB954]", playing && "animate-[eq_0.9s_ease-in-out_infinite]")}
+          className={cn("w-[3px] origin-bottom rounded-[1px] bg-foreground", playing && "animate-[eq_0.9s_ease-in-out_infinite]")}
           style={{ height: `${h * 100}%`, animationDelay: `${i * 0.18}s` }}
         />
       ))}
@@ -60,10 +60,11 @@ export function Soundtrack() {
   }, [playing, tracks]);
 
   const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-  const label = `hsl(${track.hue} 70% 55%)`;
+  // A muted label tint per song: enough to tell records apart without turning the page into a rainbow.
+  const label = `hsl(${track.hue} 26% 52%)`;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950 text-neutral-200 shadow-[0_24px_60px_-28px_rgb(0_0_0/0.6)]">
+    <div className="overflow-hidden rounded-2xl border border-border bg-muted/40">
       <div className="grid gap-6 p-5 sm:grid-cols-[11rem_1fr] sm:items-center">
         {/* The turntable. */}
         <div className="relative mx-auto size-44">
@@ -80,7 +81,7 @@ export function Soundtrack() {
             <span
               aria-hidden
               className="absolute inset-[34%] grid place-items-center rounded-full transition-colors duration-700"
-              style={{ background: `radial-gradient(circle, ${label}, hsl(${track.hue} 60% 35%))` }}
+              style={{ background: `radial-gradient(circle, ${label}, hsl(${track.hue} 22% 30%))` }}
             >
               <span className="size-2 rounded-full bg-neutral-950" />
             </span>
@@ -97,25 +98,25 @@ export function Soundtrack() {
         </div>
 
         <div className="min-w-0">
-          <p className="flex items-center gap-2 font-mono text-[10.5px] tracking-[0.14em] text-neutral-500 uppercase">
+          <p className="flex items-center gap-2 text-xs text-muted-foreground">
             <SpotifyMark className="size-3.5" />
             On repeat
           </p>
-          <p className="mt-3 truncate text-xl font-semibold tracking-tight text-white">{track.title}</p>
-          <p className="truncate text-sm text-neutral-400">{track.artist}</p>
+          <p className="mt-3 truncate text-xl font-semibold tracking-tight">{track.title}</p>
+          <p className="truncate text-sm text-muted-foreground">{track.artist}</p>
 
           <div className="mt-4">
-            <div className="h-1 overflow-hidden rounded-full bg-white/10">
-              <div className="h-full rounded-full bg-[#1DB954] transition-[width] duration-1000 ease-linear" style={{ width: `${(elapsed / total) * 100}%` }} />
+            <div className="h-1 overflow-hidden rounded-full bg-foreground/10">
+              <div className="h-full rounded-full bg-foreground transition-[width] duration-1000 ease-linear" style={{ width: `${(elapsed / total) * 100}%` }} />
             </div>
-            <div className="mt-1.5 flex justify-between font-mono text-[11px] text-neutral-500 tabular-nums">
+            <div className="mt-1.5 flex justify-between font-mono text-[11px] text-muted-foreground tabular-nums">
               <span>{clock(elapsed)}</span>
               <span>{track.length}</span>
             </div>
           </div>
 
           <div className="mt-2 flex items-center gap-2">
-            <button type="button" aria-label="Previous song" onClick={() => go(index - 1)} className="grid size-9 place-items-center rounded-full text-neutral-400 transition-colors hover:text-white">
+            <button type="button" aria-label="Previous song" onClick={() => go(index - 1)} className="grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:text-foreground">
               <SkipBack className="size-4" fill="currentColor" />
             </button>
             <button
@@ -123,18 +124,18 @@ export function Soundtrack() {
               aria-label={playing ? "Stop the record" : "Spin the record"}
               aria-pressed={playing}
               onClick={() => setPlaying((p) => !p)}
-              className="grid size-11 place-items-center rounded-full bg-white text-neutral-950 transition-transform hover:scale-105 active:scale-95"
+              className="grid size-11 place-items-center rounded-full bg-foreground text-background transition-transform hover:scale-105 active:scale-95"
             >
               {playing ? <Pause className="size-4" fill="currentColor" /> : <Play className="size-4 translate-x-px" fill="currentColor" />}
             </button>
-            <button type="button" aria-label="Next song" onClick={() => go(index + 1)} className="grid size-9 place-items-center rounded-full text-neutral-400 transition-colors hover:text-white">
+            <button type="button" aria-label="Next song" onClick={() => go(index + 1)} className="grid size-9 place-items-center rounded-full text-muted-foreground transition-colors hover:text-foreground">
               <SkipForward className="size-4" fill="currentColor" />
             </button>
             <a
               href={spotify(track)}
               target="_blank"
               rel="noreferrer"
-              className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-white/15 px-3 py-1.5 text-xs text-neutral-300 transition-colors hover:border-[#1DB954] hover:text-white"
+              className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
             >
               Listen on Spotify <span aria-hidden>↗</span>
             </a>
@@ -142,7 +143,7 @@ export function Soundtrack() {
         </div>
       </div>
 
-      <ol className="border-t border-white/10 px-2 py-2">
+      <ol className="border-t border-border px-2 py-2">
         {tracks.map((t, i) => {
           const current = i === index;
           return (
@@ -155,16 +156,16 @@ export function Soundtrack() {
                 }}
                 aria-current={current}
                 className={cn(
-                  "grid w-full grid-cols-[1.5rem_1fr_auto] items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-white/5",
-                  current && "bg-white/[0.06]",
+                  "grid w-full grid-cols-[1.5rem_1fr_auto] items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-foreground/5",
+                  current && "bg-foreground/[0.07]",
                 )}
               >
-                <span className="font-mono text-xs text-neutral-500 tabular-nums">{current ? <Bars playing={playing} /> : i + 1}</span>
+                <span className="font-mono text-xs text-muted-foreground tabular-nums">{current ? <Bars playing={playing} /> : i + 1}</span>
                 <span className="min-w-0">
-                  <span className={cn("block truncate text-sm", current ? "text-[#1DB954]" : "text-neutral-200")}>{t.title}</span>
-                  <span className="block truncate text-xs text-neutral-500">{t.artist}</span>
+                  <span className={cn("block truncate text-sm", current ? "font-medium text-foreground" : "text-foreground/85")}>{t.title}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{t.artist}</span>
                 </span>
-                <span className="font-mono text-xs text-neutral-500 tabular-nums">{t.length}</span>
+                <span className="font-mono text-xs text-muted-foreground tabular-nums">{t.length}</span>
               </button>
             </li>
           );
@@ -175,7 +176,7 @@ export function Soundtrack() {
         <iframe
           title="Spotify playlist"
           src={`https://open.spotify.com/embed/playlist/${soundtrack.spotifyPlaylist}?theme=0`}
-          className="block h-[152px] w-full border-t border-white/10"
+          className="block h-[152px] w-full border-t border-border"
           allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
           loading="lazy"
         />

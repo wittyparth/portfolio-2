@@ -21,7 +21,9 @@ import { VolumeX } from "@/components/animate-ui/icons/volume-x";
 import { House } from "@/components/animate-ui/icons/house";
 import { Terminal } from "@/components/animate-ui/icons/terminal";
 import { NotebookPen } from "@/components/animate-ui/icons/notebook-pen";
-import { Layers } from "@/components/animate-ui/icons/layers";
+import { Laptop } from "lucide-react";
+import { Ellipsis } from "@/components/animate-ui/icons/ellipsis";
+import { Camera } from "@/components/animate-ui/icons/camera";
 import { ChevronDown } from "@/components/animate-ui/icons/chevron-down";
 import { Folder } from "@/components/animate-ui/icons/folder";
 import { BookOpen } from "@/components/animate-ui/icons/book-open";
@@ -45,7 +47,7 @@ const links = [
 const more = [
   { href: "/play", label: "Play", hint: "Typing test", icon: <Terminal size={16} /> },
   { href: "/guestbook", label: "Guestbook", hint: "Leave a note", icon: <NotebookPen size={16} /> },
-  { href: "/uses", label: "Uses", hint: "My setup", icon: <Layers size={16} /> },
+  { href: "/uses", label: "Uses", hint: "My setup", icon: <Laptop size={16} /> },
 ];
 
 // The top-level section a path belongs to: /blog/some-post → /blog.
@@ -75,6 +77,46 @@ function MoreMenu({ active }: { active: boolean }) {
             </Link>
           </DropdownMenuItem>
         ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+const moreMobile = [
+  { href: "/life", label: "Life", hint: "Off the clock", icon: <Camera size={16} /> },
+  ...more,
+];
+
+/** Phones have no top links, so the pages that aren't in the bar live behind this. */
+function MobileMore({ active }: { active: boolean }) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label="More pages"
+          className={`flex h-14 w-[4.25rem] flex-col items-center justify-center gap-1 text-xs outline-none data-[state=open]:text-foreground ${active ? "text-foreground" : "text-muted-foreground"}`}
+        >
+          <Ellipsis size={18} />
+          More
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="end" sideOffset={12} className="w-56 rounded-xl p-1.5">
+        {moreMobile.map((m) => (
+          <DropdownMenuItem key={m.href} asChild className="cursor-pointer gap-3 rounded-lg px-2.5 py-2">
+            <Link href={m.href}>
+              <span className="grid size-8 place-items-center rounded-md border border-border text-muted-foreground">{m.icon}</span>
+              <span className="flex flex-col leading-tight">
+                <span className="text-sm">{m.label}</span>
+                <span className="text-xs text-muted-foreground">{m.hint}</span>
+              </span>
+            </Link>
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuItem onSelect={() => setTimeout(openCommandPalette, 0)} className="cursor-pointer gap-3 rounded-lg px-2.5 py-2">
+          <span className="grid size-8 place-items-center rounded-md border border-border text-muted-foreground"><Search size={16} /></span>
+          <span className="text-sm">Search the site</span>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -169,7 +211,7 @@ export function Nav() {
             >
               <Search size={14} animateOnHover />
               Search
-              <kbd className="rounded-full bg-muted px-1.5 py-0.5 font-mono text-[10px]">⌘K</kbd>
+              <kbd className="rounded-full bg-muted px-1.5 py-0.5 font-mono text-xs text-foreground/75">⌘K</kbd>
             </button>
             <Tip label="Resume" side="bottom">
               <button type="button" onClick={openResume} aria-label="View resume" className={iconBtn}>
@@ -213,23 +255,16 @@ export function Nav() {
                   <BottomNavigationItem
                     value={item.value}
                     href={item.href}
-                    className="flex h-14 w-[4.5rem] flex-col items-center justify-center gap-1 text-muted-foreground data-[minimized]:size-11 data-[minimized]:gap-0 data-[selected]:text-foreground"
+                    className="flex h-14 w-[4.25rem] flex-col items-center justify-center gap-1 text-muted-foreground data-[minimized]:size-11 data-[minimized]:gap-0 data-[selected]:text-foreground"
                   >
                     {item.icon}
-                    <BottomNavigationLabel className="text-[11px]">{item.label}</BottomNavigationLabel>
+                    <BottomNavigationLabel className="text-xs">{item.label}</BottomNavigationLabel>
                   </BottomNavigationItem>
                 </BottomNavigationHighlightItem>
               </li>
             ))}
             <li>
-              <button
-                onClick={openCommandPalette}
-                aria-label="Search"
-                className="flex h-14 w-[4.5rem] flex-col items-center justify-center gap-1 text-[11px] text-muted-foreground"
-              >
-                <Search size={18} />
-                Search
-              </button>
+              <MobileMore active={moreMobile.some((m) => section(pathname) === m.href)} />
             </li>
           </ul>
         </BottomNavigationHighlight>
