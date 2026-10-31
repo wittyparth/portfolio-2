@@ -1,30 +1,27 @@
 "use client";
 
-import * as React from "react";
-import { motion, useReducedMotion, useScroll, useTransform } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 
 /**
- * Home section header, doubling as the divider between sections: a small diamond that turns
- * and a flat hairline that draws itself across as the heading scrolls up the page.
+ * Home section header, doubling as the divider between sections: a chapter number,
+ * the title, and a rule that draws itself across when the section scrolls into view.
  */
-export function SectionHead({ title, action }: { title: string; action?: React.ReactNode }) {
+export function SectionHead({ n, total, title, action }: { n: number; total: number; title: string; action?: React.ReactNode }) {
   const reduce = useReducedMotion();
-  const ref = React.useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start 95%", "start 62%"] });
-  const draw = useTransform(scrollYProgress, [0, 1], [0, 1]);
-  const turn = useTransform(scrollYProgress, [0, 1], [0, 135]);
   return (
-    <div ref={ref} className="mb-6 flex items-center gap-3">
-      <motion.span
-        aria-hidden
-        className="size-2 shrink-0 border border-foreground/60 bg-background"
-        style={reduce ? { rotate: 45 } : { rotate: turn }}
-      />
+    <div className="mb-6 flex items-center gap-3">
+      <span className="inline-flex h-6 items-center rounded-md border border-border bg-background px-1.5 font-mono text-[11px] text-muted-foreground tabular-nums">
+        {String(n).padStart(2, "0")}
+        <span className="opacity-50">/{String(total).padStart(2, "0")}</span>
+      </span>
       <h2 className="shrink-0 text-lg font-medium tracking-tight">{title}</h2>
       <motion.span
         aria-hidden
-        className="h-px flex-1 origin-left bg-border"
-        style={reduce ? undefined : { scaleX: draw }}
+        className="h-px flex-1 origin-left bg-gradient-to-r from-border via-border to-transparent"
+        initial={reduce ? false : { scaleX: 0 }}
+        whileInView={{ scaleX: 1 }}
+        viewport={{ once: true, margin: "-40px" }}
+        transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
       />
       {action && <span className="shrink-0">{action}</span>}
     </div>

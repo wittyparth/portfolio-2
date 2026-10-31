@@ -15,11 +15,11 @@ import { AroundHere } from "@/components/around-here";
 import { SectionHead } from "@/components/section-head";
 
 function Section({
-  id, title, action, children,
-}: { id: string; title: string; action?: React.ReactNode; children: React.ReactNode }) {
+  id, order, title, action, children,
+}: { id: string; order: string[]; title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section id={id} className="scroll-mt-24 pt-16">
-      <SectionHead title={title} action={action} />
+      <SectionHead n={order.indexOf(id) + 1} total={order.length} title={title} action={action} />
       {children}
     </section>
   );
@@ -43,44 +43,47 @@ function projectsByTech() {
 
 export default async function Home() {
   const [contributions, weather] = await Promise.all([getContributions(), getWeather()]);
+  const activity = !!contributions && contributions.total > 0 && contributions.days.length > 0;
+  // Section order on the page; the separators number themselves from it.
+  const order = ["work", "stack", "projects", "writing", "around", ...(activity ? ["activity"] : []), "contact"];
 
   return (
     <>
       <Hero weather={weather} streak={contributions && contributions.total > 0 ? contributions.streak : null} shipped={getProjects().length} />
 
       <main className="mx-auto w-full max-w-[44rem] px-6 pb-28 sm:pb-16">
-        <Section id="work" title="Work and education">
+        <Section order={order} id="work" title="Work and education">
           <CareerLog />
         </Section>
 
-        <Section id="stack" title="Tools I reach for">
+        <Section order={order} id="stack" title="Tools I reach for">
           <Stack usedIn={projectsByTech()} />
         </Section>
 
-        <Section id="projects" title="Projects" action={<SectionLink href="/projects">All projects</SectionLink>}>
+        <Section order={order} id="projects" title="Projects" action={<SectionLink href="/projects">All projects</SectionLink>}>
           <HomeProjects
             featured={featuredProjects().map((p) => ({ ...p, headings: [] }))}
             all={getProjects().map((p) => ({ ...p, headings: [], architecture: null }))}
           />
         </Section>
 
-        <Section id="writing" title="Writing" action={<SectionLink href="/blog">All posts</SectionLink>}>
+        <Section order={order} id="writing" title="Writing" action={<SectionLink href="/blog">All posts</SectionLink>}>
           <WritingList posts={getPosts().slice(0, 3)} />
         </Section>
 
-        <Section id="around" title="Around the site">
+        <Section order={order} id="around" title="Around the site">
           <AroundHere />
         </Section>
 
-        <Section id="contact" title="Get in touch">
-          <Contact />
-        </Section>
-
-        {contributions && contributions.total > 0 && contributions.days.length > 0 && (
-          <Section id="activity" title="Activity">
+        {activity && (
+          <Section order={order} id="activity" title="Activity">
             <Heatmap data={contributions} />
           </Section>
         )}
+
+        <Section order={order} id="contact" title="Get in touch">
+          <Contact />
+        </Section>
 
         <footer className="mt-20 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-6 text-sm text-muted-foreground">
           <span>© {profile.fullName}</span>

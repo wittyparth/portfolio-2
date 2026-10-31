@@ -137,7 +137,7 @@ function Connector({ from, to }: { from: number; to: number }) {
 }
 
 export function CareerLog() {
-  const [open, setOpen] = React.useState<string | null>(hash(career[0].role + career[0].start));
+  const [open, setOpen] = React.useState<string | null>(null);
 
   return (
     <div>
