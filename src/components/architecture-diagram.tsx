@@ -7,7 +7,8 @@ import {
 } from "lucide-react";
 import { ScrollFade } from "@animate-ui/react/primitives/effects/scroll-fade";
 import type { Architecture } from "@/lib/architecture";
-import { tech } from "@/lib/tech";
+import { techMeta } from "@/lib/tech-client";
+import { Glyph } from "./glyph";
 import { cn } from "@/lib/utils";
 
 type Node = Architecture["nodes"][number];
@@ -73,14 +74,8 @@ function route(a: Box, b: Box, offset: number) {
 }
 
 function NodeIcon({ node }: { node: Node }) {
-  const t = node.tech ? tech(node.tech) : null;
-  if (t?.path) {
-    return (
-      <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden>
-        <path d={t.path} />
-      </svg>
-    );
-  }
+  const t = node.tech ? techMeta(node.tech) : null;
+  if (t?.mono) return <Glyph src={t.mono} />;
   const Icon = KIND[node.kind].icon;
   return <Icon className="size-4" aria-hidden />;
 }

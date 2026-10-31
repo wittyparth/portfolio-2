@@ -13,7 +13,7 @@ import { LayoutDashboard } from "@/components/animate-ui/icons/layout-dashboard"
 import { List } from "@/components/animate-ui/icons/list";
 import { ChevronDown, Rows3 } from "lucide-react";
 import type { Project } from "@/lib/projects";
-import { techKey } from "@/lib/tech";
+import { techKey } from "@/lib/tech-client";
 import { cn } from "@/lib/utils";
 import { FilterTabs } from "./filter-tabs";
 import { Cover } from "./project-media";
@@ -78,7 +78,7 @@ function StackFilter({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label={current ? `Technology: ${current.name}` : "Filter by technology"}
+        aria-label={current ? `${current.name}: technology filter` : "Stack: filter by technology"}
         className={cn(
           "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
           current ? "border-foreground/40 bg-accent text-foreground" : "border-border text-muted-foreground hover:bg-accent hover:text-foreground",

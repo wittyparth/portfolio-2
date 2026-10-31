@@ -2,22 +2,20 @@
 
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
-import { tech } from "@/lib/tech";
+import { INK_HEX, techMeta } from "@/lib/tech-client";
+import { Glyph } from "./glyph";
 import { Tip } from "./tip";
 
-// Logos that are effectively black would vanish in dark mode, so they keep the text color.
-const INK = new Set(["000000", "0A0A0A", "181717", "191919"]);
-
 export function TechIcon({ name, className }: { name: string; className?: string }) {
-  const t = tech(name);
-  if (!t.path) {
+  const t = techMeta(name);
+  if (!t.mono) {
     return (
       <span className={cn("rounded-full border border-border px-2 py-px font-mono text-[11px] leading-5 text-muted-foreground", className)}>
         {t.name}
       </span>
     );
   }
-  const brand = t.hex && !INK.has(t.hex) ? `#${t.hex}` : "var(--foreground)";
+  const brand = t.hex && !INK_HEX.has(t.hex) ? `#${t.hex}` : "var(--foreground)";
   return (
     <Tip label={t.name}>
       <span
@@ -28,9 +26,8 @@ export function TechIcon({ name, className }: { name: string; className?: string
           className,
         )}
       >
-        <svg role="img" aria-label={t.name} viewBox="0 0 24 24" className="size-4" fill="currentColor">
-          <path d={t.path} />
-        </svg>
+        <Glyph src={t.mono} />
+        <span className="sr-only">{t.name}</span>
       </span>
     </Tip>
   );

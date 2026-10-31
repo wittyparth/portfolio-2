@@ -10,7 +10,7 @@
     "new:project": "node scripts/new-content.mjs project",
     "new:post": "node scripts/new-content.mjs post",
     "covers": "node scripts/project-covers.mjs",
-    "logos": "node scripts/tech-logos.mjs",
+    "logos": "node scripts/tech-logos.mjs && node scripts/tech-glyphs.mjs",
     "postinstall": "node -e \"require('fs').copyFileSync(require.resolve('pdfjs-dist/build/pdf.worker.min.mjs'),'public/pdf.worker.min.mjs')\""
   },
   "dependencies": {

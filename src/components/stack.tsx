@@ -7,7 +7,7 @@ import { motion } from "motion/react";
 import { AnimateIcon } from "@animate-ui/react/icons";
 import { ChevronDown } from "@/components/animate-ui/icons/chevron-down";
 import { stack, type StackCategory, type StackLevel } from "@/lib/content";
-import { tech, techKey } from "@/lib/tech";
+import { techKey, techMeta } from "@/lib/tech-client";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-is-mobile";
 import { AutoHeight } from "@animate-ui/react/primitives/effects/auto-height";
@@ -56,7 +56,7 @@ function chart(cols: number) {
     members.forEach((s, i) => {
       const angle = i * 2.39996 + cluster * 1.3; // the golden angle keeps the spiral even
       const radius = i === 0 ? 0 : step * Math.sqrt(i + 0.35);
-      const t = tech(s.name);
+      const t = techMeta(s.name);
       const star: Star = {
         ...s,
         key: techKey(s.name),
@@ -65,7 +65,6 @@ function chart(cols: number) {
         y: Math.round((cy + Math.sin(angle) * radius * 0.86) * 10) / 10,
         cluster,
         hex: t.hex && !INK.has(t.hex) ? `#${t.hex}` : undefined,
-        path: t.path,
       };
       if (placed.length) {
         const near = placed.reduce((best, p) =>
@@ -97,7 +96,6 @@ function StarButton({
   return (
     <button
       type="button"
-      aria-label={`${star.name}, ${level.label.toLowerCase()}`}
       aria-pressed={selected}
       onPointerEnter={() => onHover(star)}
       onPointerLeave={() => onHover(null)}
@@ -120,6 +118,7 @@ function StarButton({
       )}
     >
       <TechLogo name={star.name} className="pointer-events-none" style={{ width: level.icon * size, height: level.icon * size }} />
+      <span className="sr-only">{`${star.name}, ${level.label.toLowerCase()}`}</span>
       {star.level === "daily" && (
         <span
           aria-hidden

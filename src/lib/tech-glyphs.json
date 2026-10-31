@@ -1,0 +1,487 @@
+{
+  "python": {
+    "title": "Python",
+    "hex": "3776AB",
+    "mono": "/tech/mono/python.svg"
+  },
+  "typescript": {
+    "title": "TypeScript",
+    "hex": "3178C6",
+    "mono": "/tech/mono/typescript.svg"
+  },
+  "ts": {
+    "title": "TypeScript",
+    "hex": "3178C6",
+    "mono": "/tech/mono/typescript.svg"
+  },
+  "javascript": {
+    "title": "JavaScript",
+    "hex": "F7DF1E",
+    "mono": "/tech/mono/javascript.svg"
+  },
+  "js": {
+    "title": "JavaScript",
+    "hex": "F7DF1E",
+    "mono": "/tech/mono/javascript.svg"
+  },
+  "nextjs": {
+    "title": "Next.js",
+    "hex": "000000",
+    "mono": "/tech/mono/nextdotjs.svg"
+  },
+  "next": {
+    "title": "Next.js",
+    "hex": "000000",
+    "mono": "/tech/mono/nextdotjs.svg"
+  },
+  "react": {
+    "title": "React",
+    "hex": "61DAFB",
+    "mono": "/tech/mono/react.svg"
+  },
+  "reactnative": {
+    "title": "React",
+    "hex": "61DAFB",
+    "mono": "/tech/mono/react.svg"
+  },
+  "nodejs": {
+    "title": "Node.js",
+    "hex": "5FA04E",
+    "mono": "/tech/mono/nodedotjs.svg"
+  },
+  "node": {
+    "title": "Node.js",
+    "hex": "5FA04E",
+    "mono": "/tech/mono/nodedotjs.svg"
+  },
+  "express": {
+    "title": "Express",
+    "hex": "0A0A0A",
+    "mono": "/tech/mono/express.svg"
+  },
+  "vite": {
+    "title": "Vite",
+    "hex": "9135FF",
+    "mono": "/tech/mono/vite.svg"
+  },
+  "tailwindcss": {
+    "title": "Tailwind CSS",
+    "hex": "06B6D4",
+    "mono": "/tech/mono/tailwindcss.svg"
+  },
+  "tailwind": {
+    "title": "Tailwind CSS",
+    "hex": "06B6D4",
+    "mono": "/tech/mono/tailwindcss.svg"
+  },
+  "fastapi": {
+    "title": "FastAPI",
+    "hex": "009688",
+    "mono": "/tech/mono/fastapi.svg"
+  },
+  "pydantic": {
+    "title": "Pydantic",
+    "hex": "E92063",
+    "mono": "/tech/mono/pydantic.svg"
+  },
+  "postgresql": {
+    "title": "PostgreSQL",
+    "hex": "4169E1",
+    "mono": "/tech/mono/postgresql.svg"
+  },
+  "postgres": {
+    "title": "PostgreSQL",
+    "hex": "4169E1",
+    "mono": "/tech/mono/postgresql.svg"
+  },
+  "redis": {
+    "title": "Redis",
+    "hex": "FF4438",
+    "mono": "/tech/mono/redis.svg"
+  },
+  "celery": {
+    "title": "Celery",
+    "hex": "37814A",
+    "mono": "/tech/mono/celery.svg"
+  },
+  "prisma": {
+    "title": "Prisma",
+    "hex": "2D3748",
+    "mono": "/tech/mono/prisma.svg"
+  },
+  "supabase": {
+    "title": "Supabase",
+    "hex": "3FCF8E",
+    "mono": "/tech/mono/supabase.svg"
+  },
+  "firebase": {
+    "title": "Firebase",
+    "hex": "DD2C00",
+    "mono": "/tech/mono/firebase.svg"
+  },
+  "docker": {
+    "title": "Docker",
+    "hex": "2496ED",
+    "mono": "/tech/mono/docker.svg"
+  },
+  "vercel": {
+    "title": "Vercel",
+    "hex": "000000",
+    "mono": "/tech/mono/vercel.svg"
+  },
+  "turborepo": {
+    "title": "Turborepo",
+    "hex": "FF1E56",
+    "mono": "/tech/mono/turborepo.svg"
+  },
+  "langchain": {
+    "title": "LangChain",
+    "hex": "7FC8FF",
+    "mono": "/tech/mono/langchain.svg"
+  },
+  "langgraph": {
+    "title": "LangGraph",
+    "hex": "7FC8FF",
+    "mono": "/tech/mono/langgraph.svg"
+  },
+  "qdrant": {
+    "title": "Qdrant",
+    "hex": "DC244C",
+    "mono": "/tech/mono/qdrant.svg"
+  },
+  "pytorch": {
+    "title": "PyTorch",
+    "hex": "EE4C2C",
+    "mono": "/tech/mono/pytorch.svg"
+  },
+  "scikitlearn": {
+    "title": "scikit-learn",
+    "hex": "F7931E",
+    "mono": "/tech/mono/scikitlearn.svg"
+  },
+  "sklearn": {
+    "title": "scikit-learn",
+    "hex": "F7931E",
+    "mono": "/tech/mono/scikitlearn.svg"
+  },
+  "gemini": {
+    "title": "Google Gemini",
+    "hex": "8E75B2",
+    "mono": "/tech/mono/googlegemini.svg"
+  },
+  "googlegemini": {
+    "title": "Google Gemini",
+    "hex": "8E75B2",
+    "mono": "/tech/mono/googlegemini.svg"
+  },
+  "claude": {
+    "title": "Anthropic",
+    "hex": "191919",
+    "mono": "/tech/mono/anthropic.svg"
+  },
+  "anthropic": {
+    "title": "Anthropic",
+    "hex": "191919",
+    "mono": "/tech/mono/anthropic.svg"
+  },
+  "mcp": {
+    "title": "Model Context Protocol",
+    "hex": "000000",
+    "mono": "/tech/mono/modelcontextprotocol.svg"
+  },
+  "modelcontextprotocol": {
+    "title": "Model Context Protocol",
+    "hex": "000000",
+    "mono": "/tech/mono/modelcontextprotocol.svg"
+  },
+  "puppeteer": {
+    "title": "Puppeteer",
+    "hex": "40B5A4",
+    "mono": "/tech/mono/puppeteer.svg"
+  },
+  "stripe": {
+    "title": "Stripe",
+    "hex": "635BFF",
+    "mono": "/tech/mono/stripe.svg"
+  },
+  "django": {
+    "title": "Django",
+    "hex": "092E20",
+    "mono": "/tech/mono/django.svg"
+  },
+  "flask": {
+    "title": "Flask",
+    "hex": "3BABC3",
+    "mono": "/tech/mono/flask.svg"
+  },
+  "git": {
+    "title": "Git",
+    "hex": "F03C2E",
+    "mono": "/tech/mono/git.svg"
+  },
+  "expo": {
+    "title": "Expo",
+    "hex": "1C2024",
+    "mono": "/tech/mono/expo.svg"
+  },
+  "pytest": {
+    "title": "Pytest",
+    "hex": "0A9EDC",
+    "mono": "/tech/mono/pytest.svg"
+  },
+  "zod": {
+    "title": "Zod",
+    "hex": "408AFF",
+    "mono": "/tech/mono/zod.svg"
+  },
+  "shadcnui": {
+    "title": "shadcn/ui",
+    "hex": "000000",
+    "mono": "/tech/mono/shadcnui.svg"
+  },
+  "shadcn": {
+    "title": "shadcn/ui",
+    "hex": "000000",
+    "mono": "/tech/mono/shadcnui.svg"
+  },
+  "upstash": {
+    "title": "Upstash",
+    "hex": "00E9A3",
+    "mono": "/tech/mono/upstash.svg"
+  },
+  "huggingface": {
+    "title": "Hugging Face",
+    "hex": "FFD21E",
+    "mono": "/tech/mono/huggingface.svg"
+  },
+  "transformers": {
+    "title": "Hugging Face",
+    "hex": "FFD21E",
+    "mono": "/tech/mono/huggingface.svg"
+  },
+  "ollama": {
+    "title": "Ollama",
+    "hex": "000000",
+    "mono": "/tech/mono/ollama.svg"
+  },
+  "numpy": {
+    "title": "NumPy",
+    "hex": "013243",
+    "mono": "/tech/mono/numpy.svg"
+  },
+  "pandas": {
+    "title": "pandas",
+    "hex": "150458",
+    "mono": "/tech/mono/pandas.svg"
+  },
+  "jupyter": {
+    "title": "Jupyter",
+    "hex": "F37626",
+    "mono": "/tech/mono/jupyter.svg"
+  },
+  "kubernetes": {
+    "title": "Kubernetes",
+    "hex": "326CE5",
+    "mono": "/tech/mono/kubernetes.svg"
+  },
+  "k8s": {
+    "title": "Kubernetes",
+    "hex": "326CE5",
+    "mono": "/tech/mono/kubernetes.svg"
+  },
+  "githubactions": {
+    "title": "GitHub Actions",
+    "hex": "2088FF",
+    "mono": "/tech/mono/githubactions.svg"
+  },
+  "linux": {
+    "title": "Linux",
+    "hex": "FCC624",
+    "mono": "/tech/mono/linux.svg"
+  },
+  "googlecloud": {
+    "title": "Google Cloud",
+    "hex": "4285F4",
+    "mono": "/tech/mono/googlecloud.svg"
+  },
+  "gcp": {
+    "title": "Google Cloud",
+    "hex": "4285F4",
+    "mono": "/tech/mono/googlecloud.svg"
+  },
+  "mongodb": {
+    "title": "MongoDB",
+    "hex": "47A248",
+    "mono": "/tech/mono/mongodb.svg"
+  },
+  "mongo": {
+    "title": "MongoDB",
+    "hex": "47A248",
+    "mono": "/tech/mono/mongodb.svg"
+  },
+  "sqlite": {
+    "title": "SQLite",
+    "hex": "003B57",
+    "mono": "/tech/mono/sqlite.svg"
+  },
+  "tensorflow": {
+    "title": "TensorFlow",
+    "hex": "FF6F00",
+    "mono": "/tech/mono/tensorflow.svg"
+  },
+  "streamlit": {
+    "title": "Streamlit",
+    "hex": "FF4B4B",
+    "mono": "/tech/mono/streamlit.svg"
+  },
+  "nginx": {
+    "title": "NGINX",
+    "hex": "009639",
+    "mono": "/tech/mono/nginx.svg"
+  },
+  "mistral": {
+    "title": "Mistral AI",
+    "hex": "FA520F",
+    "mono": "/tech/mono/mistralai.svg"
+  },
+  "mistralai": {
+    "title": "Mistral AI",
+    "hex": "FA520F",
+    "mono": "/tech/mono/mistralai.svg"
+  },
+  "postman": {
+    "title": "Postman",
+    "hex": "FF6C37",
+    "mono": "/tech/mono/postman.svg"
+  },
+  "bun": {
+    "title": "Bun",
+    "hex": "000000",
+    "mono": "/tech/mono/bun.svg"
+  },
+  "sqlalchemy": {
+    "title": "SQLAlchemy",
+    "hex": "D71F00",
+    "mono": "/tech/mono/sqlalchemy.svg"
+  },
+  "rabbitmq": {
+    "title": "RabbitMQ",
+    "hex": "FF6600",
+    "mono": "/tech/mono/rabbitmq.svg"
+  },
+  "cursor": {
+    "title": "Cursor",
+    "hex": "000000",
+    "mono": "/tech/mono/cursor.svg"
+  },
+  "notion": {
+    "title": "Notion",
+    "hex": "000000",
+    "mono": "/tech/mono/notion.svg"
+  },
+  "figma": {
+    "title": "Figma",
+    "hex": "F24E1E",
+    "mono": "/tech/mono/figma.svg"
+  },
+  "opencv": {
+    "title": "OpenCV",
+    "hex": "5C3EE8",
+    "mono": "/tech/mono/opencv.svg"
+  },
+  "keras": {
+    "title": "Keras",
+    "hex": "D00000",
+    "mono": "/tech/mono/keras.svg"
+  },
+  "pnpm": {
+    "title": "pnpm",
+    "hex": "F69220",
+    "mono": "/tech/mono/pnpm.svg"
+  },
+  "cloudflare": {
+    "title": "Cloudflare",
+    "hex": "F38020",
+    "mono": "/tech/mono/cloudflare.svg"
+  },
+  "motion": {
+    "title": "Framer",
+    "hex": "0055FF",
+    "mono": "/tech/mono/framer.svg"
+  },
+  "framermotion": {
+    "title": "Framer",
+    "hex": "0055FF",
+    "mono": "/tech/mono/framer.svg"
+  },
+  "framer": {
+    "title": "Framer",
+    "hex": "0055FF",
+    "mono": "/tech/mono/framer.svg"
+  },
+  "graphql": {
+    "title": "GraphQL",
+    "hex": "E10098",
+    "mono": "/tech/mono/graphql.svg"
+  },
+  "c++": {
+    "title": "C++",
+    "hex": "00599C",
+    "mono": "/tech/mono/cplusplus.svg"
+  },
+  "cpp": {
+    "title": "C++",
+    "hex": "00599C",
+    "mono": "/tech/mono/cplusplus.svg"
+  },
+  "cplusplus": {
+    "title": "C++",
+    "hex": "00599C",
+    "mono": "/tech/mono/cplusplus.svg"
+  },
+  "bash": {
+    "title": "GNU Bash",
+    "hex": "4EAA25",
+    "mono": "/tech/mono/gnubash.svg"
+  },
+  "shell": {
+    "title": "GNU Bash",
+    "hex": "4EAA25",
+    "mono": "/tech/mono/gnubash.svg"
+  },
+  "elasticsearch": {
+    "title": "Elasticsearch",
+    "hex": "005571",
+    "mono": "/tech/mono/elasticsearch.svg"
+  },
+  "render": {
+    "title": "Render",
+    "hex": "000000",
+    "mono": "/tech/mono/render.svg"
+  },
+  "apple": {
+    "title": "Apple",
+    "hex": "000000",
+    "mono": "/tech/mono/apple.svg"
+  },
+  "macbook": {
+    "title": "Apple",
+    "hex": "000000",
+    "mono": "/tech/mono/apple.svg"
+  },
+  "macos": {
+    "title": "Apple",
+    "hex": "000000",
+    "mono": "/tech/mono/apple.svg"
+  },
+  "spotify": {
+    "title": "Spotify",
+    "hex": "1ED760",
+    "mono": "/tech/mono/spotify.svg"
+  },
+  "leetcode": {
+    "title": "LeetCode",
+    "hex": "FFA116",
+    "mono": "/tech/mono/leetcode.svg"
+  }
+}

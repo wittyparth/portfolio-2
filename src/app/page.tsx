@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { profile } from "@/lib/content";
 import { featuredProjects, getProjects } from "@/lib/projects";
-import { techKey } from "@/lib/tech";
+import { techKey } from "@/lib/tech-client";
 import { getPosts } from "@/lib/blog";
 import { getContributions, getWeather } from "@/lib/live";
 import { JsonLd } from "@/components/json-ld";
