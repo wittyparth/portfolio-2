@@ -258,7 +258,7 @@ export function AgentGraph({ weather }: { weather: Weather | null }) {
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
               className="flex min-w-0 gap-2.5"
             >
-              <span className={cn("w-10 shrink-0", newest ? "text-emerald-700 dark:text-emerald-400" : "text-muted-foreground")}>{RUN[i].tag}</span>
+              <span className={cn("w-10 shrink-0", newest ? "text-emerald-700 dark:text-emerald-400" : "text-foreground/75")}>{RUN[i].tag}</span>
               <span className="truncate text-foreground">{RUN[i].line(ctx)}</span>
             </motion.li>
             );

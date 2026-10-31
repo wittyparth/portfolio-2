@@ -123,6 +123,10 @@
 .dark .shiki span {
   color: var(--shiki-dark);
 }
+/* github-dark's comment grey (#6A737D) is 3.8:1 on the code background; lift it to AA. */
+.dark .shiki span[style*="--shiki-dark:#6A737D"] {
+  color: #9198a1;
+}
 
 /* Architecture diagrams: streamed edges march toward their target. */
 @keyframes arch-march {

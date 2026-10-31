@@ -6,7 +6,7 @@ import { useReducedMotion } from "motion/react";
 import {
   Tabs, TabsContent, TabsContents, TabsHighlight, TabsHighlightItem, TabsList, TabsTrigger,
 } from "@animate-ui/react/primitives/tabs";
-import { CarouselCounter, CarouselDots } from "@animate-ui/react/primitives/carousel";
+import { CarouselCounter } from "@animate-ui/react/primitives/carousel";
 import {
   Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi,
 } from "@/components/ui/carousel";
@@ -97,8 +97,7 @@ function Gallery({
               )}
               className="flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 font-mono text-[11px] text-white tabular-nums backdrop-blur"
             />
-            {/* Dots stay 6px to look; 18px gaps keep them 24px apart (WCAG target spacing) and ::after widens each hit area. */}
-            <CarouselDots className="pointer-events-auto flex items-center !gap-[18px] rounded-full bg-black/55 px-3 py-2 text-white backdrop-blur [&_button]:relative [&_button]:!size-1.5 [&_button]:after:absolute [&_button]:after:-inset-[9px] [&_button]:after:content-['']" />
+            {/* No dots: the counter and arrows already say where you are, and 6px dots are too small to tap. */}
           </div>
         </>
       )}
